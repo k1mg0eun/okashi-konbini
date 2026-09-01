@@ -1,0 +1,1165 @@
+import { useState, useEffect, useRef, useMemo } from "react";
+import { playChimeThenBgm, playCrunch } from "./sounds.js";
+import CUP_IMG from "./assets/cup.png";
+import CUP_OPEN_IMG from "./assets/cup-open.png";
+import MUSH_IMG from "./assets/mushroom.png";
+import MUSH_OPEN_IMG from "./assets/mushroom-open.png";
+import ANIM_IMG from "./assets/animals.png";
+import ANIM_OPEN_IMG from "./assets/animals-open.png";
+import BIS_ELEPHANT from "./assets/animals/elephant.png";
+import BIS_RABBIT from "./assets/animals/rabbit.png";
+import BIS_DUCK from "./assets/animals/duck.png";
+import BIS_CAT from "./assets/animals/cat.png";
+import BIS_FISH from "./assets/animals/fish.png";
+import BIS_TURTLE from "./assets/animals/turtle.png";
+
+// ── shared tokens ────────────────────────────────────────────
+const F = {
+  disp: "'Mochiy Pop One', sans-serif",
+  body: "'Zen Maru Gothic', ui-rounded, system-ui, sans-serif",
+};
+const rand = (a, b) => a + Math.random() * (b - a);
+function useMedia(q) {
+  const [m, setM] = useState(() => window.matchMedia(q).matches);
+  useEffect(() => { const mq = window.matchMedia(q); const f = () => setM(mq.matches); mq.addEventListener("change", f); return () => mq.removeEventListener("change", f); }, [q]);
+  return m;
+}
+function useSize(ref) {
+  const [sz, setSz] = useState({ w: 0, h: 0 });
+  useEffect(() => {
+    if (!ref.current) return;
+    const ro = new ResizeObserver(([e]) => setSz({ w: e.contentRect.width, h: e.contentRect.height }));
+    ro.observe(ref.current);
+    return () => ro.disconnect();
+  }, [ref]);
+  return sz;
+}
+const FM = { green: "#00A040", blue: "#0068B7", ink: "#1F2A33", wall: "#F1F4F2", shelf: "#FFFFFF" };
+
+const GLOBAL_CSS = `
+  @import url('https://fonts.googleapis.com/css2?family=Mochiy+Pop+One&family=Zen+Maru+Gothic:wght@500;700&family=Noto+Sans+JP:wght@700;900&display=swap');
+  @keyframes rise { from { transform: translateY(70px) } to { transform: translateY(0) } }
+  @keyframes fly { 0% { transform: translate(0,0) rotate(0deg) } 45% { transform: translate(var(--dx), -220px) rotate(80deg) } 100% { transform: translate(var(--dx), var(--dy)) rotate(90deg) } }
+  @keyframes wobble { 0%,100% { transform: rotate(calc(var(--amp) * -1deg)) } 50% { transform: rotate(calc(var(--amp) * 1deg)) } }
+  @keyframes rattle { 0%,100% { transform: translateX(0) rotate(0) } 25% { transform: translateX(-4px) rotate(-2deg) } 75% { transform: translateX(4px) rotate(2deg) } }
+  @keyframes pop { 0% { opacity:1; transform: translate(0,0) rotate(0) scale(var(--s)) } 100% { opacity:0; transform: translate(var(--x), var(--y)) rotate(var(--r)) scale(var(--s)) } }
+  @keyframes fall { to { transform: translate(var(--x), 140px) rotate(var(--r)); opacity: .9 } }
+  @keyframes floaty { 0%,100% { transform: translateY(0) } 50% { transform: translateY(-6px) } }
+  @keyframes sprout { 0% { transform: scaleY(0) } 70% { transform: scaleY(1.1) } 100% { transform: scaleY(1) } }
+  @keyframes capDrop { 0% { transform: translate(0,0) rotate(0) } 100% { transform: translate(var(--x), 160px) rotate(var(--r)); opacity: 0 } }
+  @keyframes wiggle { 0%,100% { transform: rotate(-4deg) } 50% { transform: rotate(4deg) } }
+  @keyframes drinkPick { 0% { transform: translateY(0) scale(1); opacity: 1 } 100% { transform: translateY(-16px) scale(1.06); opacity: 0 } }
+  .drinkSlot { flex-shrink: 0; transition: width .35s cubic-bezier(.4,0,.2,1), margin-right .35s cubic-bezier(.4,0,.2,1), transform .15s ease; }
+  .drinkSlot.canPick { cursor: pointer; }
+  .drinkSlot.canPick:hover { transform: translateY(-3px); }
+  .drinkSlot.picking { animation: drinkPick .28s ease-out both; pointer-events: none; }
+  .drinkSlot.taken { width: 0 !important; margin-right: 0 !important; visibility: hidden; pointer-events: none; }
+  @keyframes drinkRestock { 0% { transform: translateX(36px) scale(.9); opacity: 0 } 100% { transform: none; opacity: 1 } }
+  .drinkSlot.restock { animation: drinkRestock .45s cubic-bezier(.2,.8,.3,1) backwards; }
+  @keyframes shakeX { 0%,100% { transform: translateX(0) } 20% { transform: translateX(-8px) } 60% { transform: translateX(8px) } }
+  @keyframes fadeIn { from { opacity: 0; transform: translateY(12px) } to { opacity: 1; transform: none } }
+  @keyframes lidOpen { to { transform: rotateX(-110deg) } }
+  @keyframes openPop { 0% { transform: translateX(-50%) scale(.96) } 60% { transform: translateX(-50%) scale(1.02) } 100% { transform: translateX(-50%) scale(1) } }
+  @keyframes openPopL { 0% { transform: scale(.96) } 60% { transform: scale(1.02) } 100% { transform: scale(1) } }
+  @keyframes swing { 0%,100% { transform: rotate(-3deg) } 50% { transform: rotate(3deg) } }
+  @keyframes zoomIn { from { transform: scale(1) } to { transform: scale(5); opacity: 0 } }
+  @keyframes bisIdle { 0%,100% { transform: rotateX(8deg) rotateY(-14deg) } 50% { transform: rotateX(-6deg) rotateY(14deg) } }
+  @keyframes bisBake { 0% { transform: rotateX(0) rotateY(0) } 60% { transform: rotateX(-10deg) rotateY(380deg) scale(1.12) } 100% { transform: rotateX(0) rotateY(360deg) scale(1) } }
+  .bis { position: relative; touch-action: none; cursor: grab; user-select: none; -webkit-user-select: none; }
+  .bis:active { cursor: grabbing; }
+  .bisBody { position: absolute; inset: 0; transform-style: preserve-3d; will-change: transform; }
+  .bisBody.idle { animation: bisIdle 5s ease-in-out infinite; }
+  .bisBody.bake { animation: bisBake .9s cubic-bezier(.3,.8,.3,1) both; }
+  .bisLayer { position: absolute; inset: 0; -webkit-mask-size: contain; mask-size: contain; -webkit-mask-repeat: no-repeat; mask-repeat: no-repeat; -webkit-mask-position: center; mask-position: center; transition: background .5s; }
+  .bisFace { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; transition: filter .5s; pointer-events: none; }
+  .scene { animation: fadeIn .45s ease-out both; }
+  .fridgeDoor { position: absolute; top: 0; bottom: 0; left: 0; width: 100%; transition: transform .85s cubic-bezier(.4,0,.2,1); cursor: pointer; }
+  .fridgeDoor:hover .fridgeHandle { background: linear-gradient(90deg, #C9D1CE, #FFFFFF 50%, #C9D1CE); }
+  .tierScroll { scrollbar-width: none; -webkit-overflow-scrolling: touch; cursor: grab; }
+  .tierScroll:active { cursor: grabbing; }
+  .tierScroll::-webkit-scrollbar { display: none; }
+  .stickBtn { cursor: grab; transition: transform .18s; }
+  .stickBtn:hover, .stickBtn:focus-visible { transform: translateY(-18px) !important; outline: none; }
+  .shroom { cursor: pointer; transform-origin: bottom center; transition: transform .2s; }
+  .shroom:hover, .shroom:focus-visible { animation: wiggle .5s ease-in-out infinite; outline: none; }
+  .boxBtn { cursor: pointer; transition: transform .25s cubic-bezier(.2,.9,.3,1.3); transform-origin: bottom center; background: none; border: 0; padding: 0; font-family: inherit; }
+  .boxBtn:hover, .boxBtn:focus-visible { transform: translateY(-16px) rotate(-2deg); outline: none; }
+  .btn { border: 0; border-radius: 99px; padding: 10px 18px; font-weight: 700; font-family: inherit; cursor: pointer; }
+  .btn:focus-visible { outline: 3px solid #0068B7; outline-offset: 2px; }
+  @media (prefers-reduced-motion: reduce) { * { animation-duration: .01ms !important; transition: none !important; } }
+`;
+
+// ── generic chrome ───────────────────────────────────────────
+function TopBar({ index, title, color, labelColor = FM.blue, onBack }) {
+  return (
+    <div style={{ display: "flex", alignItems: "center", gap: 12, padding: "18px 24px 0", position: "relative", zIndex: 2 }}>
+      <button className="btn" onClick={onBack} style={{ background: FM.green, color: "#fff", boxShadow: `0 3px 0 ${FM.blue}`, fontSize: 13, whiteSpace: "nowrap", flexShrink: 0 }}>
+        ← 선반으로
+      </button>
+      <span style={{ fontSize: 12, letterSpacing: ".18em", fontWeight: 700, color: labelColor, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", minWidth: 0 }}>コンビニ おかしコーナー · {index}</span>
+    </div>
+  );
+}
+
+// ═════════════════════════════════════════════════════════════
+// SCENE 1 · SHELF
+// ═════════════════════════════════════════════════════════════
+function Shelf({ onOpen }) {
+  const [opening, setOpening] = useState(null);
+  const [lift, setLift] = useState(null); // { ti, x } — tier temporarily un-clipped while its package opens
+  const rowRefs = useRef([]);
+  const desktop = useMedia("(min-width: 900px)");
+  const gondolaRef = useRef(null);
+  const { w: gw, h: gh } = useSize(gondolaRef);
+
+  // 마우스 드래그로 선반 밀기 (터치 스크롤은 브라우저가 기본 제공)
+  const dragRef = useRef(null);    // 드래그 중인 선반 정보 { el, x, left }
+  const draggedRef = useRef(false); // 방금 동작이 드래그였으면 클릭(open)을 무시
+  useEffect(() => {
+    function move(e) {
+      const d = dragRef.current;
+      if (!d) return;
+      const dx = e.clientX - d.x;
+      if (Math.abs(dx) > 5) draggedRef.current = true;
+      d.el.scrollLeft = d.left - dx;
+    }
+    function up() { dragRef.current = null; }
+    window.addEventListener("mousemove", move);
+    window.addEventListener("mouseup", up);
+    return () => { window.removeEventListener("mousemove", move); window.removeEventListener("mouseup", up); };
+  }, []);
+
+  function open(key, uid, ti) {
+    if (draggedRef.current) return;
+    playCrunch();
+    const el = rowRefs.current[ti];
+    if (el) setLift({ ti, x: el.scrollLeft });
+    setOpening(uid || key);
+    setTimeout(() => onOpen(key), OPEN_IMG[key] ? 1000 : 650);
+  }
+
+  // one product per shelf, repeated along the whole rail
+  const base = [
+    { h: 136, n: 9, span: 3, real: "potato", price: 205, kind: "cup" },
+    { h: 128, n: 6, span: 2, real: "mushroom", price: 284, kind: "mbox" },
+    { h: 184, n: 6, span: 2, real: "animals", price: 178, kind: "abox" },
+  ];
+  // 데스크톱: 세로로는 3단이 한 화면에 들어오게 스케일, 가로로는 폭에 맞춰 개수를 채운다
+  const RAIL = 12 + 50 + 22;                       // 선반 립 + 가격표 레일 + 하단 그늘 (단당 고정 높이)
+  const S = desktop && gh ? Math.min(1.6, Math.max(1, (gh - RAIL * base.length - 24) / base.reduce((a, t) => a + t.h, 0))) : 1;
+  const tiers = base.map((t) => {
+    const pw = PKG_W[t.kind] * S;
+    const inner = gw - 12;                          // 좌우 여백(6px×2) 제외한 선반 가용 폭
+    // 데스크톱은 스크롤 없이 폭에 들어가는 개수만 진열한다
+    const n = desktop && gw ? Math.max(1, Math.floor((inner + 3) / (pw + 3))) : t.n;
+    // 남는 폭은 과자 사이 간격으로 균등 분배 (가격표 레일도 같은 간격을 쓴다)
+    const g = desktop && gw && n > 1 ? Math.max(3, Math.min(48, Math.floor((inner - n * pw) / (n - 1)))) : 3;
+    return { ...t, h: Math.round(t.h * S), pw, n, g };
+  });
+
+  const tierRows = tiers.map((t, ti) => (
+    <div key={ti} ref={(el) => (rowRefs.current[ti] = el)} className={desktop ? undefined : "tierScroll"} onMouseDown={desktop ? undefined : (e) => { draggedRef.current = false; dragRef.current = { el: e.currentTarget, x: e.clientX, left: e.currentTarget.scrollLeft }; e.preventDefault(); }} style={{ position: "relative", overflowX: lift?.ti === ti ? "visible" : desktop ? "hidden" : "auto", overflowY: lift?.ti === ti ? "visible" : "hidden", zIndex: lift?.ti === ti ? 20 : 1 }}>
+      <div style={{ display: "inline-flex", flexDirection: "column", minWidth: "100%", transform: lift?.ti === ti ? `translateX(${-lift.x}px)` : "none" }}>
+        {/* products */}
+        <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "safe center", gap: t.g, height: t.h, padding: `0 ${desktop ? 6 : Math.max(6, t.g)}px` }}>
+          {Array.from({ length: t.n }).map((_, f) => (
+            <RealPackage key={f} item={{ kind: t.kind, key: t.real }} h={t.h - 14} scale={S} active={opening === `${ti}-${f}`} onClick={() => open(t.real, `${ti}-${f}`, ti)} />
+          ))}
+        </div>
+        {/* shelf lip + price rail */}
+        <div style={{ height: 12, background: "linear-gradient(180deg, #FFFFFF, #E3E8E6)", boxShadow: "0 3px 0 #C5CDCA" }} />
+        <div style={{ display: "flex", justifyContent: "safe center", gap: t.g, height: 50, padding: `0 ${desktop ? 6 : Math.max(6, t.g)}px`, background: "#EEF1F0", borderBottom: `5px solid ${FM.green}` }}>
+          {(() => {
+            const span = t.span || 1;                       // facings per price tag
+            const tags = Math.ceil(t.n / span);
+            return Array.from({ length: tags }).map((_, g) => {
+              const k = Math.min(span, t.n - g * span);    // last tag may cover fewer
+              return (
+                <div key={g} style={{ width: t.pw * k + t.g * (k - 1), flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center" }}>
+                  <PriceTag info={REAL[t.real]} price={t.price} />
+                </div>
+              );
+            });
+          })()}
+        </div>
+        <div style={{ height: 22, background: "linear-gradient(180deg, #D3DAD7, #F1F4F2)" }} />
+      </div>
+    </div>
+  ));
+
+  const pegboard = <div style={{ position: "absolute", inset: "0", backgroundImage: "radial-gradient(#D7DEDB 1.4px, transparent 1.8px)", backgroundSize: "18px 18px", zIndex: 0 }} />;
+
+  if (!desktop) {
+    return (
+      <div className="scene" style={{ minHeight: "100vh", background: FM.wall, position: "relative", overflow: "hidden" }}>
+        <Fascia />
+        <GlassStrip><InfoPoster /></GlassStrip>
+        {pegboard}
+        <div style={{ position: "relative", paddingTop: 18 }}>{tierRows}</div>
+      </div>
+    );
+  }
+
+  // ── 데스크톱: 얇은 파사드 + [안내 포스터 컬럼 | 곤돌라 선반] + 바닥 ──
+  return (
+    <div className="scene" style={{ height: "100vh", background: FM.wall, position: "relative", overflow: "hidden", display: "flex", flexDirection: "column" }}>
+      <Fascia compact />
+      <div style={{ position: "relative", flex: 1, minHeight: 0, display: "grid", gridTemplateColumns: "clamp(260px, 23vw, 560px) 1fr clamp(280px, 27vw, 600px)" }}>
+        {pegboard}
+        {/* ceiling light strip */}
+        <div style={{ position: "absolute", left: 0, right: 0, top: 0, height: 10, background: "linear-gradient(180deg, #FFFFFF, #E9EDEB)", boxShadow: "0 2px 0 #C9D1CE, 0 12px 28px rgba(255,255,255,.9)", zIndex: 1 }} />
+        {/* left: glass window with sign + poster */}
+        <div style={{ position: "relative", zIndex: 2, padding: "26px 0 0 22px", display: "flex", flexDirection: "column" }}>
+          <GlassStrip vertical><InfoPoster vertical /></GlassStrip>
+        </div>
+        {/* right: gondola shelf */}
+        <div ref={gondolaRef} style={{ position: "relative", zIndex: 2, padding: "22px 18px 0", display: "flex", flexDirection: "column", justifyContent: "flex-end", minWidth: 0 }}>
+          {/* end panels (gondola uprights) */}
+          <div style={{ position: "absolute", top: 12, bottom: 0, left: 6, width: 12, background: "linear-gradient(90deg, #9AA5A1, #E8EDEB 45%, #B7C0BC)", borderRadius: "3px 3px 0 0", zIndex: 5 }} />
+          <div style={{ position: "absolute", top: 12, bottom: 0, right: 6, width: 12, background: "linear-gradient(90deg, #B7C0BC, #E8EDEB 55%, #9AA5A1)", borderRadius: "3px 3px 0 0", zIndex: 5 }} />
+          <div style={{ position: "relative" }}>{tierRows}</div>
+        </div>
+        {/* right: drink fridge */}
+        <div style={{ position: "relative", zIndex: 2, padding: "22px 22px 0 6px", display: "flex", flexDirection: "column", minWidth: 0 }}>
+          <DrinkFridge />
+        </div>
+      </div>
+      {/* floor: kick plate + tiles */}
+      <div style={{ position: "relative", zIndex: 3, height: 64, flexShrink: 0, background: "linear-gradient(180deg, #B9C3BF 0 8px, #DDE3E0 8px)", backgroundImage: "linear-gradient(180deg, #B9C3BF 0 8px, transparent 8px), linear-gradient(90deg, rgba(0,0,0,.06) 1px, transparent 1px), linear-gradient(180deg, rgba(0,0,0,.06) 1px, transparent 1px)", backgroundSize: "100% 100%, 56px 56px, 56px 56px", boxShadow: "inset 0 10px 14px -8px rgba(0,0,0,.25)" }} />
+    </div>
+  );
+}
+
+// ── 음료 냉장고 (데스크톱) — 유리문 2짝, 클릭하면 경첩 기준으로 열린다. 음료는 임시 CSS 목업 ──
+// 한 단 = 한 종류. 실제 음료 이미지가 오면 kind/color 대신 img로 교체하면 된다.
+const DRINK_ROWS = [
+  { kind: "can", colors: ["#D8232A", "#D8232A", "#D8232A", "#1B5DB8", "#1B5DB8", "#1B5DB8", "#0B7A3B", "#0B7A3B", "#111"] , tags: [{ name: "コーラ", sub: "缶 350ml", jan: "4902102072618", price: 140 }, { name: "サイダー", sub: "缶 350ml", jan: "4901340002807", price: 130 }] },
+  { kind: "pet", colors: ["#BFE3F5", "#BFE3F5", "#BFE3F5", "#BFE3F5", "#8FD0F0", "#8FD0F0", "#3DBE6C", "#3DBE6C"], tags: [{ name: "お茶", sub: "ペットボトル 500ml", jan: "4901085614310", price: 130 }, { name: "水", sub: "ペットボトル 550ml", jan: "4902102113304", price: 110 }] },
+  { kind: "pet", colors: ["#F39A1E", "#F39A1E", "#F39A1E", "#F6C62B", "#F6C62B", "#E8442E", "#E8442E", "#7B4DB5"], tags: [{ name: "オレンジジュース", sub: "ペットボトル 470ml", jan: "4902179009623", price: 150 }, { name: "ぶどうジュース", sub: "ペットボトル 470ml", jan: "4902179009630", price: 150 }] },
+  { kind: "milk", colors: ["#FFFFFF", "#FFFFFF", "#FFFFFF", "#FFE9A8", "#FFE9A8", "#D7B48A", "#D7B48A", "#F6C5D6"], tags: [{ name: "牛乳", sub: "紙パック 500ml", jan: "4902720049450", price: 130 }, { name: "コーヒー", sub: "紙パック 240ml", jan: "4902720049467", price: 120 }] },
+];
+
+function Drink({ kind, color, h }) {
+  const w = kind === "can" ? h * .52 : h * .36;
+  const label = <div style={{ position: "absolute", left: "12%", right: "12%", top: kind === "can" ? "34%" : "48%", height: "26%", background: "rgba(255,255,255,.85)", borderRadius: 2, boxShadow: "inset 0 0 0 1px rgba(0,0,0,.08)" }} />;
+  const shine = <div style={{ position: "absolute", left: "14%", top: "6%", bottom: "6%", width: "14%", borderRadius: 99, background: "rgba(255,255,255,.45)" }} />;
+  if (kind === "can") return (
+    <div style={{ position: "relative", width: w, height: h, flexShrink: 0, borderRadius: "6px 6px 5px 5px", background: `linear-gradient(90deg, ${color}, ${color} 60%, rgba(0,0,0,.18))`, boxShadow: "inset 0 -3px 0 rgba(0,0,0,.25), 0 2px 3px rgba(0,0,0,.2)" }}>
+      <div style={{ position: "absolute", left: 0, right: 0, top: 0, height: "8%", borderRadius: "6px 6px 0 0", background: "linear-gradient(180deg, #F2F5F4, #AAB3B0)" }} />
+      {shine}{label}
+    </div>
+  );
+  // PET / 우유병: 캡 + 목 + 몸통
+  const cap = kind === "milk" ? "#2F6FB8" : (color === "#BFE3F5" || color === "#8FD0F0" ? "#4CA9E6" : color);
+  return (
+    <div style={{ position: "relative", width: w, height: h, flexShrink: 0, display: "flex", flexDirection: "column", alignItems: "center" }}>
+      <div style={{ width: "46%", height: "9%", background: cap, borderRadius: "3px 3px 1px 1px", boxShadow: "inset 0 -2px 0 rgba(0,0,0,.25)" }} />
+      <div style={{ width: "58%", height: "10%", background: kind === "milk" ? color : `color-mix(in srgb, ${color} 60%, #fff)`, borderRadius: "40% 40% 0 0 / 100% 100% 0 0" }} />
+      <div style={{ position: "relative", width: "100%", flex: 1, borderRadius: kind === "milk" ? "4px 4px 5px 5px" : "5px 5px 6px 6px", background: `linear-gradient(90deg, ${color}, ${color} 62%, rgba(0,0,0,.14))`, boxShadow: "inset 0 -3px 0 rgba(0,0,0,.18), 0 2px 3px rgba(0,0,0,.2)" }}>
+        {shine}{label}
+      </div>
+    </div>
+  );
+}
+
+function DrinkFridge() {
+  const [open, setOpen] = useState(() => new URLSearchParams(window.location.search).get("fridge") === "open"); // ?fridge=open 으로 열린 상태 확인 (개발용)
+  const innerRef = useRef(null);
+  const { w: iw, h: ih } = useSize(innerRef);
+  const rowH = ih ? ih / DRINK_ROWS.length : 150;
+  const anyOpen = open;
+  // 음료 집기: key(`row-idx`) → "picking"(튀어오름) → "taken"(폭이 0으로 줄며 옆 병들이 밀려와 채움)
+  const [picked, setPicked] = useState({});
+  const pick = (key) => (e) => {
+    e.stopPropagation();
+    if (!anyOpen || picked[key]) return;
+    setPicked((m) => ({ ...m, [key]: "picking" }));
+    setTimeout(() => setPicked((m) => ({ ...m, [key]: "taken" })), 280);
+  };
+  // 재입고: 한 줄을 다 비우면 잠시 뒤 새 음료가 뒤에서 밀려 들어와 채움
+  const nRef = useRef([]);
+  const [restock, setRestock] = useState({});           // row → tick (키를 바꿔 슬라이드 인 애니메이션 재생)
+  useEffect(() => {
+    const timers = [];
+    DRINK_ROWS.forEach((_, i) => {
+      const n = nRef.current[i];
+      if (!n) return;
+      const taken = Object.entries(picked).filter(([k, v]) => k.startsWith(`${i}-`) && v === "taken").length;
+      if (taken < n) return;
+      timers.push(setTimeout(() => {
+        setPicked((m) => Object.fromEntries(Object.entries(m).filter(([k]) => !k.startsWith(`${i}-`))));
+        setRestock((r) => ({ ...r, [i]: (r[i] || 0) + 1 }));
+      }, 1200));
+    });
+    return () => timers.forEach(clearTimeout);
+  }, [picked]);
+
+  const rows = DRINK_ROWS.map((r, i) => {
+    const avail = rowH - 42;                                   // 선반 8 + 가격 레일 34
+    const h = Math.round(avail * (r.kind === "can" ? .62 : .86));
+    const w = r.kind === "can" ? h * .52 : h * .36;
+    const gap = 3;
+    const n = iw ? Math.max(4, Math.floor((iw - 16) / (w + gap))) : 8;
+    nRef.current[i] = n;
+    const tick = restock[i] || 0;
+    return (
+      <div key={i} style={{ position: "relative", flex: 1, minHeight: 0, display: "flex", flexDirection: "column", justifyContent: "flex-end" }}>
+        <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "center", padding: "0 8px", overflow: "hidden" }}>
+          {Array.from({ length: n }).map((_, k) => {
+            const key = `${i}-${k}`, st = picked[key];
+            return (
+              <div key={`${k}-${tick}`} className={`drinkSlot${st ? " " + st : anyOpen ? " canPick" : ""}${tick && !st ? " restock" : ""}`} onClick={pick(key)} style={{ width: w, marginRight: gap, animationDelay: tick ? `${k * 45}ms` : undefined }}>
+                <Drink kind={r.kind} color={r.colors[k % r.colors.length]} h={h} />
+              </div>
+            );
+          })}
+        </div>
+        {/* 선반 + LED 라인 */}
+        <div style={{ height: 8, background: "linear-gradient(180deg, #F4F8FA, #C9D3D8)", boxShadow: "0 2px 0 #9FB0B8, 0 -6px 12px rgba(255,255,255,.9)" }} />
+        {/* 가격 레일 — 곤돌라와 같은 방식, 카드 2장을 좌우로 벌려 배치 */}
+        <div style={{ height: 34, display: "flex", alignItems: "center", justifyContent: "space-evenly", padding: "0 8px", background: "#E9F0F3", borderBottom: "2px solid #B9C7CE", overflow: "hidden" }}>
+          {r.tags.map((t, g) => (
+            <PriceTag key={g} info={{ name: t.name, sub: t.sub, jan: t.jan }} price={t.price} scale={.72} />
+          ))}
+        </div>
+      </div>
+    );
+  });
+
+  // 슬라이드 유리문 1짝 — 왼쪽 손잡이를 잡고 오른쪽으로 밀어 넣는 방식
+  const door = (() => {
+    const isOpen = open;
+    return (
+      <div className="fridgeDoor" role="button" aria-label={isOpen ? "냉장고 문 닫기" : "냉장고 문 열기"} onClick={() => setOpen((o) => !o)}
+        style={{ transform: isOpen ? "translateX(86%)" : "none", zIndex: 5 }}>
+        {/* 유리 + 프레임 */}
+        <div style={{ position: "absolute", inset: 0, border: "7px solid #C0C9CE", borderColor: "#D9E0E3 #A3AEB4 #A3AEB4 #D9E0E3", background: isOpen ? "linear-gradient(115deg, rgba(255,255,255,.14) 0 18%, rgba(220,235,242,.08) 18% 42%, rgba(255,255,255,.06) 42% 55%, rgba(200,222,232,.1) 55%)" : "linear-gradient(115deg, rgba(255,255,255,.28) 0 18%, rgba(220,235,242,.16) 18% 42%, rgba(255,255,255,.12) 42% 55%, rgba(200,222,232,.18) 55%)", boxShadow: isOpen ? "-10px 0 24px rgba(0,0,0,.22), inset 0 0 0 2px rgba(255,255,255,.6)" : "inset 0 0 0 2px rgba(255,255,255,.6)" }}>
+          {/* 손잡이 */}
+          <div className="fridgeHandle" style={{ position: "absolute", top: "30%", bottom: "30%", left: 10, width: 10, borderRadius: 5, background: "linear-gradient(90deg, #8F9A96, #E8EDEB 50%, #8F9A96)", boxShadow: "0 2px 4px rgba(0,0,0,.35)" }} />
+          {/* つめた〜い 스티커 */}
+          <div style={{ position: "absolute", top: 14, left: 30, padding: "5px 9px", background: "#1B5DB8", color: "#fff", borderRadius: 99, fontFamily: "'Noto Sans JP', sans-serif", fontWeight: 900, fontSize: 11, letterSpacing: ".06em", boxShadow: "0 2px 0 rgba(0,0,0,.2)", transform: "rotate(-4deg)" }}>❄ つめた〜い</div>
+          <div style={{ position: "absolute", top: 14, right: 14, width: 64, padding: "5px 0", background: A.yellow, color: "#D0021B", border: `2px solid ${A.pinkDeep}`, borderRadius: 3, textAlign: "center", fontFamily: "'Noto Sans JP', sans-serif", fontWeight: 900, fontSize: 11, transform: "rotate(3deg)", boxShadow: "0 2px 0 rgba(0,0,0,.15)" }}>2本で<br />¥200</div>
+        </div>
+      </div>
+    );
+  })();
+
+  return (
+    <div style={{ flex: 1, minHeight: 0, display: "flex", flexDirection: "column", borderRadius: "6px 6px 0 0", background: "linear-gradient(180deg, #D5DDE1, #B9C3C8)", boxShadow: "0 0 0 2px #9EA9AF, 0 10px 24px rgba(0,0,0,.18)", position: "relative" }}>
+      {/* 상단 간판 */}
+      <div style={{ height: 46, flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", gap: 12, background: "linear-gradient(180deg, #C6CFD4, #ADB8BE)", borderBottom: "2px solid #939EA4", borderRadius: "6px 6px 0 0", color: "#fff", textShadow: "0 1px 0 rgba(0,0,0,.15)", fontFamily: "'Noto Sans JP', sans-serif", fontWeight: 900 }}>
+        <span style={{ fontSize: 18, letterSpacing: ".18em", whiteSpace: "nowrap" }}>ドリンク</span>
+        {iw >= 340 && <span style={{ fontSize: 10, letterSpacing: ".24em", color: "#E6F5EE", whiteSpace: "nowrap" }}>COLD DRINKS</span>}
+      </div>
+      {/* 본체: 내부 + 유리문 */}
+      <div style={{ position: "relative", flex: 1, minHeight: 0, margin: "0 8px", overflow: "hidden" }}>
+        <div ref={innerRef} onClick={() => anyOpen && setOpen(false)} style={{ position: "absolute", inset: 0, background: "linear-gradient(180deg, #F3FAFF, #DCEBF4)", boxShadow: "inset 0 0 40px rgba(120,170,200,.35)", display: "flex", flexDirection: "column", overflow: "hidden", cursor: anyOpen ? "pointer" : "default" }}>
+          {/* 내부 LED 천장 */}
+          <div style={{ position: "absolute", left: 0, right: 0, top: 0, height: 6, background: "#fff", boxShadow: "0 0 24px 10px rgba(255,255,255,.95)", zIndex: 2 }} />
+          {rows}
+        </div>
+        {door}
+      </div>
+      {/* 하단 그릴 */}
+      <div style={{ height: 40, flexShrink: 0, margin: "0 8px", background: "repeating-linear-gradient(180deg, #C6CFD4 0 4px, #A3AEB4 4px 8px)", borderTop: "4px solid #B9C3C8" }} />
+    </div>
+  );
+}
+
+// ── store fascia + info poster (original signage, brand colors only) ──
+function Fascia({ compact }) {
+  return (
+    <div style={{ position: "relative", zIndex: 2, flexShrink: 0 }}>
+      {/* eave */}
+      <div style={{ height: 8, background: "linear-gradient(180deg, #CFD6D3, #B7C0BC)" }} />
+      {/* fascia band */}
+      <div style={{ background: FM.green, padding: compact ? "12px 22px 0" : "14px 16px 0", position: "relative" }}>
+        <div style={{ maxWidth: compact ? "none" : 560, width: compact ? "fit-content" : "auto", margin: compact ? 0 : "0 auto", background: "#fff", borderRadius: 4, padding: compact ? "16px 24px 14px" : "10px 18px 8px", textAlign: compact ? "left" : "center", boxShadow: "0 2px 0 rgba(0,0,0,.15)", display: compact ? "flex" : "block", alignItems: "baseline", gap: 14 }}>
+          <div style={{ fontFamily: "'Noto Sans JP', sans-serif", fontWeight: 900, fontSize: compact ? 28 : "clamp(20px, 4.5vw, 30px)", color: FM.blue, letterSpacing: "-.01em", lineHeight: 1 }}>おかしコンビニ</div>
+          <div style={{ fontSize: 10, fontWeight: 700, color: FM.green, letterSpacing: ".22em", marginTop: compact ? 0 : 4 }}>과자 편의점 · OKASHI KONBINI · 24H</div>
+        </div>
+        {/* stripes */}
+        <div style={{ marginTop: compact ? 8 : 12, height: 6, background: "#fff" }} />
+        <div style={{ height: 6, background: FM.blue }} />
+      </div>
+    </div>
+  );
+}
+
+// 유리창 띠 — 모바일은 가로 띠, 데스크톱은 선반 옆 세로 창
+function GlassStrip({ vertical, children }) {
+  return (
+    <div style={{ background: "linear-gradient(180deg, #E4EEF3, #CFDEE6)", borderBottom: vertical ? "none" : "6px solid #9EAAB0", border: vertical ? "6px solid #9EAAB0" : undefined, borderBottomWidth: vertical ? 0 : 6, borderRadius: vertical ? "6px 6px 0 0" : 0, padding: vertical ? "18px 14px 20px" : "12px 16px 14px", position: "relative", overflow: "hidden", zIndex: 2, flex: vertical ? 1 : "none", display: vertical ? "flex" : "block", flexDirection: "column" }}>
+      <div style={{ position: "absolute", inset: 0, background: "repeating-linear-gradient(115deg, transparent 0 140px, rgba(255,255,255,.35) 140px 170px)", pointerEvents: "none" }} />
+      {children}
+    </div>
+  );
+}
+
+function InfoPoster({ vertical }) {
+  return (
+    <div style={{ maxWidth: 560, margin: "0 auto", display: "flex", flexDirection: vertical ? "column" : "row", gap: vertical ? 40 : 10, alignItems: vertical ? "center" : "stretch", position: "relative", width: "100%" }}>
+      {/* hanging door sign */}
+      <div style={{ flexShrink: 0, alignSelf: vertical ? "center" : "flex-start", width: 62, display: "flex", flexDirection: "column", alignItems: "center", marginTop: vertical ? -18 : -12, transformOrigin: "top center", animation: "swing 3.2s ease-in-out infinite" }}>
+        <div style={{ width: 10, height: 10, borderRadius: "50%", background: "#B7C0BC", boxShadow: "inset 0 -2px 0 #8F9A96" }} />
+        <div style={{ width: 2, height: 14, background: "#8F9A96" }} />
+        <div style={{ width: 62, background: "#fff", border: "2px solid " + FM.ink, borderRadius: 6, padding: "6px 0 5px", textAlign: "center", boxShadow: "0 2px 0 rgba(0,0,0,.2)", fontFamily: "'Noto Sans JP', sans-serif" }}>
+          <div style={{ fontWeight: 900, fontSize: 13, color: FM.green, lineHeight: 1 }}>営業中</div>
+          <div style={{ fontWeight: 900, fontSize: 8, color: FM.blue, letterSpacing: ".08em", marginTop: 3 }}>24時間</div>
+        </div>
+      </div>
+      {/* poster taped to the glass */}
+      <div style={{ flex: vertical ? "none" : 1, width: vertical ? "100%" : "auto", maxWidth: vertical ? 270 : "none", background: "#fff", borderRadius: 4, padding: vertical ? "11px 13px 12px" : "10px 14px 12px", boxShadow: "0 3px 8px rgba(0,0,0,.12)", position: "relative", fontFamily: "'Noto Sans JP', 'Zen Maru Gothic', sans-serif", color: FM.ink, transform: vertical ? "rotate(-1.2deg)" : "none" }}>
+        <div style={{ position: "absolute", top: -6, left: "50%", transform: "translateX(-50%) rotate(-2deg)", width: 46, height: 12, background: "rgba(255,255,255,.7)", border: "1px solid rgba(0,0,0,.08)" }} />
+        <div style={{ display: "inline-block", background: FM.green, color: "#fff", fontSize: 10, fontWeight: 900, padding: "2px 8px", borderRadius: 2, letterSpacing: ".1em" }}>あそびかた · 이용 안내</div>
+        <div style={{ fontWeight: 900, fontSize: vertical ? 16 : "clamp(14px, 3.4vw, 18px)", marginTop: 8, lineHeight: 1.35, wordBreak: "keep-all" }}>
+          좋아하는 과자를 골라 <span style={{ color: FM.blue }}>뜯으면</span>,{vertical ? <br /> : " "}미니게임이 시작돼요.
+        </div>
+        <ol style={{ margin: vertical ? "8px 0 0" : "10px 0 0", paddingLeft: 18, fontSize: vertical ? 11 : 12, fontWeight: 700, lineHeight: 1.7, wordBreak: "keep-all" }}>
+          <li>{vertical ? "선반에 놓인 과자를 천천히 구경하세요" : "선반을 옆으로 밀며 과자를 구경하세요"}</li>
+          <li>마음에 드는 과자를 톡 누르면 포장이 열려요</li>
+          <li>재밌는 미니 게임을 즐겨보세요!</li>
+        </ol>
+        <div style={{ marginTop: 10, fontSize: 9, fontWeight: 700, color: "#6B7A83", letterSpacing: ".08em" }}>じゃがりこ · きのこの山 · たべっ子どうぶつ</div>
+      </div>
+      {/* 음료 안내 메모 — 데스크톱(냉장고가 있는 화면)에서만 */}
+      {vertical && (
+        <div style={{ width: "100%", maxWidth: 260, background: "#fff", borderRadius: 4, padding: "10px 12px 12px", boxShadow: "0 3px 8px rgba(0,0,0,.12)", position: "relative", fontFamily: "'Noto Sans JP', 'Zen Maru Gothic', sans-serif", color: FM.ink, transform: "rotate(1deg)" }}>
+          <div style={{ position: "absolute", top: -6, left: "50%", transform: "translateX(-50%) rotate(2deg)", width: 40, height: 12, background: "rgba(255,255,255,.7)", border: "1px solid rgba(0,0,0,.08)" }} />
+          <div style={{ display: "inline-block", background: FM.blue, color: "#fff", fontSize: 10, fontWeight: 900, padding: "2px 8px", borderRadius: 2, letterSpacing: ".1em" }}>のみもの · 음료 안내</div>
+          <div style={{ fontWeight: 900, fontSize: 15, marginTop: 8, lineHeight: 1.35, wordBreak: "keep-all" }}>
+            시원한 <span style={{ color: FM.blue }}>음료</span>도 마실 수 있어요.
+          </div>
+          <ol style={{ margin: "8px 0 0", paddingLeft: 18, fontSize: 11, fontWeight: 700, lineHeight: 1.7, wordBreak: "keep-all" }}>
+            <li>냉장고 유리문을 톡 눌러 옆으로 미세요</li>
+            <li>마음에 드는 음료를 누르면 꺼내져요</li>
+            <li>한 줄을 다 비우면 새로 채워져요</li>
+          </ol>
+          <div style={{ marginTop: 8, fontSize: 9, fontWeight: 700, color: "#6B7A83", letterSpacing: ".08em" }}>コーラ · お茶 · ジュース · 牛乳</div>
+        </div>
+      )}
+      {vertical && (
+        <div style={{ marginTop: 20, width: 200, background: A.yellow, color: "#D0021B", border: `2px solid ${A.pinkDeep}`, borderRadius: 4, padding: "8px 10px", textAlign: "center", fontFamily: "'Noto Sans JP', sans-serif", fontWeight: 900, transform: "rotate(1.5deg)", boxShadow: "0 2px 0 rgba(0,0,0,.15)" }}>
+          <div style={{ fontSize: 10, color: A.pinkDeep, letterSpacing: ".1em" }}>おかし</div>
+          <div style={{ fontSize: 22, lineHeight: 1.05 }}>セール中！</div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+const OPEN_IMG = { potato: CUP_OPEN_IMG, mushroom: MUSH_OPEN_IMG, animals: ANIM_OPEN_IMG };
+// opened art that extends sideways: scale so the box part stays the same size, anchor left
+const OPEN_FIT = { mushroom: { scale: 895 / 769, left: true } };
+const PKG_W = { carton: 96, cup: 100, box: 122, abox: 150, mbox: 172, bag: 118, small: 84 };
+const REAL = {
+  potato:   { name: "じゃがりこ サラダ",        sub: "カルビー　57g",        jan: "4901330578909" },
+  mushroom: { name: "きのこの山",              sub: "明治　66g",             jan: "4902777237596" },
+  animals:  { name: "たべっ子どうぶつ バター味", sub: "ギンビス　63g",        jan: "4901588130652" },
+};
+
+function PriceTag({ info, price, scale = 1 }) {
+  return (
+    <div style={{ flexShrink: 0, width: 128, zoom: scale, background: "#fff", borderRadius: 3, padding: "3px 6px 3px", boxShadow: "0 1px 0 #c9d1ce", fontFamily: "'Noto Sans JP', 'Hiragino Kaku Gothic ProN', 'Zen Maru Gothic', sans-serif", color: "#111", lineHeight: 1.15 }}>
+      <div style={{ fontSize: 8.5, fontWeight: 900, letterSpacing: ".02em", whiteSpace: "nowrap", overflow: "hidden" }}>{info.name}</div>
+      <div style={{ fontSize: 5.5, fontWeight: 700, color: "#333", marginTop: 1, whiteSpace: "nowrap" }}>{info.sub}</div>
+      <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", marginTop: 3 }}>
+        <div>
+          <div style={{ height: 9, width: 52, background: "repeating-linear-gradient(90deg, #111 0 1px, transparent 1px 2px, #111 2px 4px, transparent 4px 5px, #111 5px 6px, transparent 6px 8px)" }} />
+          {info.jan && <div style={{ fontSize: 4.8, letterSpacing: ".14em", color: "#222", marginTop: 1, fontVariantNumeric: "tabular-nums" }}>{info.jan}</div>}
+        </div>
+        <div style={{ display: "flex", alignItems: "baseline", gap: 3 }}>
+          <span style={{ background: "#D0021B", color: "#fff", fontSize: 6, fontWeight: 900, padding: "1px 3px", borderRadius: 2, alignSelf: "center" }}>税込</span>
+          <span style={{ fontSize: 16, fontWeight: 900, letterSpacing: "-.02em", lineHeight: 1 }}>{price}</span>
+          <span style={{ fontSize: 7, fontWeight: 900 }}>円</span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── flat package art (invented products, kawaii-style face like a mascot) ──
+function Art({ type, ac }) {
+  const s = { position: "absolute", left: "50%", transform: "translateX(-50%)" };
+  if (type === "tomato") return <div style={{ ...s, bottom: 18, width: 46, height: 42, borderRadius: "50%", background: "#E53935", boxShadow: "inset -6px -6px 0 #B71C1C" }}><div style={{ position: "absolute", top: -8, left: 14, width: 18, height: 12, background: "#2E7D32", clipPath: "polygon(50% 0, 100% 100%, 0 100%)" }} /></div>;
+  if (type === "orange") return <div style={{ ...s, bottom: 18, width: 46, height: 46, borderRadius: "50%", background: "radial-gradient(circle, #FFE0B2 0 20%, #FB8C00 22%)", boxShadow: "inset -6px -6px 0 #E65100" }} />;
+  if (type === "leaf") return <div style={{ ...s, bottom: 18, width: 26, height: 46, background: "#43A047", borderRadius: "0 100% 0 100%", transform: "translateX(-50%) rotate(-30deg)", boxShadow: "inset -4px -4px 0 #2E7D32" }} />;
+  if (type === "berry") return <div style={{ ...s, bottom: 18, width: 36, height: 42, background: "#E91E63", borderRadius: "50% 50% 50% 50% / 30% 30% 70% 70%", backgroundImage: "radial-gradient(#FFF59D 1.5px, transparent 2px)", backgroundSize: "9px 9px" }}><div style={{ position: "absolute", top: -6, left: 8, width: 20, height: 10, background: "#2E7D32", borderRadius: "50%" }} /></div>;
+  if (type === "bean") return <div style={{ ...s, bottom: 20, width: 34, height: 46, background: "#5D4037", borderRadius: "50%", transform: "translateX(-50%) rotate(20deg)" }}><div style={{ position: "absolute", top: 8, left: 15, width: 4, height: 30, background: "#3E2723", borderRadius: 2 }} /></div>;
+  if (type === "chips") return <div style={{ ...s, bottom: 14, display: "flex", gap: 2 }}>{[0, 1, 2].map((i) => <div key={i} style={{ width: 22, height: 30, borderRadius: "50% 50% 50% 50% / 60% 60% 40% 40%", background: "#F5C542", boxShadow: "inset 0 -4px 0 #D4A017", transform: `rotate(${(i - 1) * 18}deg)` }} />)}</div>;
+  if (type === "cube") return <div style={{ ...s, bottom: 16, display: "flex", gap: 3 }}>{[0, 1].map((i) => <div key={i} style={{ width: 22, height: 22, borderRadius: 5, background: "#FFB74D", boxShadow: "inset -4px -4px 0 #EF6C00", transform: `rotate(${i * 15 - 5}deg)` }} />)}</div>;
+  return <div style={{ ...s, bottom: 18, display: "flex", gap: 3 }}>{[0, 1, 2].map((i) => <div key={i} style={{ width: 12, height: 12, borderRadius: "50%", background: ["#64B5F6", "#F48FB1", "#FFF176"][i] }} />)}</div>;
+}
+function Face({ color }) {
+  return <div style={{ position: "absolute", top: 10, left: "50%", transform: "translateX(-50%)", display: "flex", flexDirection: "column", alignItems: "center", gap: 3 }}>
+    <div style={{ display: "flex", gap: 10 }}><div style={{ width: 4, height: 6, borderRadius: 2, background: color }} /><div style={{ width: 4, height: 6, borderRadius: 2, background: color }} /></div>
+    <div style={{ width: 8, height: 4, borderBottom: `2px solid ${color}`, borderRadius: "0 0 8px 8px" }} />
+  </div>;
+}
+
+function Package({ item, h }) {
+  const w = PKG_W[item.kind];
+  const base = { width: w, height: h, flexShrink: 0, position: "relative", background: item.bg, boxShadow: `inset -6px 0 0 rgba(0,0,0,.12), inset 0 0 0 3px ${item.ac}22` };
+  const label = (
+    <div style={{ position: "absolute", left: 6, right: 6, top: h * 0.3, textAlign: "center" }}>
+      <div style={{ fontFamily: F.disp, fontSize: item.kind === "small" ? 12 : 15, color: item.ac, lineHeight: 1.1 }}>{item.name}</div>
+      <div style={{ fontSize: 7, fontWeight: 700, color: item.ac, opacity: .8, marginTop: 2, letterSpacing: ".08em" }}>{item.sub}</div>
+    </div>
+  );
+  if (item.kind === "carton") return <div style={{ ...base, borderRadius: "4px 4px 0 0", clipPath: "polygon(0 8%, 50% 0, 100% 8%, 100% 100%, 0 100%)" }}><div style={{ position: "absolute", top: 0, left: 0, right: 0, height: `${8}%`, background: item.ac, opacity: .25 }} /><Face color={item.ac} />{label}<Art type={item.art} ac={item.ac} /></div>;
+  if (item.kind === "bag") return <div style={{ ...base, clipPath: "polygon(4% 0, 96% 0, 100% 5%, 97% 95%, 92% 100%, 8% 100%, 3% 95%, 0 5%)", boxShadow: "inset 0 0 0 4px rgba(255,255,255,.35)" }}><div style={{ position: "absolute", top: 0, left: 0, right: 0, height: 10, background: "repeating-linear-gradient(90deg, #fff8 0 3px, transparent 3px 6px)" }} /><Face color={item.ac} />{label}<Art type={item.art} ac={item.ac} /><div style={{ position: "absolute", bottom: 4, right: 10, fontSize: 7, fontWeight: 700, color: item.ac }}>60g</div></div>;
+  return <div style={{ ...base, borderRadius: 3 }}><Face color={item.ac} />{label}<Art type={item.art} ac={item.ac} /></div>;
+}
+
+// ── our three real products (original designs) ──
+function RealPackage({ item, h, active, onClick, scale = 1 }) {
+  const w = PKG_W[item.kind] * scale;
+  const opened = active && OPEN_IMG[item.key];
+  return (
+    <button className="boxBtn" onClick={onClick} aria-label="상자 열기" style={{ width: w, height: h, flexShrink: 0, position: "relative", animation: active && !opened ? "zoomIn .65s ease-in forwards" : "none", zIndex: active ? 4 : 1 }}>
+      {opened && (
+        <img src={OPEN_IMG[item.key]} alt="" draggable={false} style={{ position: "absolute", left: OPEN_FIT[item.key]?.left ? 0 : "50%", bottom: 0, transform: OPEN_FIT[item.key]?.left ? "none" : "translateX(-50%)", transformOrigin: "bottom left", width: w * (OPEN_FIT[item.key]?.scale || 1), height: "auto", maxWidth: "none", animation: `${OPEN_FIT[item.key]?.left ? "openPopL" : "openPop"} .35s cubic-bezier(.2,.9,.3,1.3) both`, filter: "drop-shadow(0 8px 12px rgba(0,0,0,.25))" }} />
+      )}
+      {!opened && item.key === "potato" && (
+        <img src={CUP_IMG} alt="" draggable={false} style={{ position: "absolute", left: 0, right: 0, bottom: 0, width: "100%", height: "100%", maxWidth: "none", objectFit: "contain", objectPosition: "bottom" }} />
+      )}
+      {!opened && item.key === "mushroom" && (
+        <img src={MUSH_IMG} alt="" draggable={false} style={{ position: "absolute", left: 0, bottom: 0, width: "100%", height: "100%", maxWidth: "none", objectFit: "contain", objectPosition: "bottom" }} />
+      )}
+      {!opened && item.key === "animals" && (
+        <img src={ANIM_IMG} alt="" draggable={false} style={{ position: "absolute", left: 0, bottom: 0, width: "100%", height: "100%", maxWidth: "none", objectFit: "contain", objectPosition: "bottom" }} />
+      )}
+    </button>
+  );
+}
+
+// ── 게임 공통: 데스크톱 좌우 분할 (왼쪽 안내 패널 | 오른쪽 플레이 영역) ──
+const GAME_COLS = "clamp(300px, 27vw, 420px) 1fr";
+function SidePanel({ bg, border, color, children }) {
+  return (
+    <aside style={{ position: "relative", zIndex: 3, background: bg, color, borderRight: `5px solid ${border}`, display: "flex", flexDirection: "column", minHeight: 0, overflow: "auto", boxShadow: "6px 0 28px rgba(0,0,0,.10)" }}>
+      {children}
+    </aside>
+  );
+}
+const PANEL_BODY = { padding: "18px 24px 26px", display: "flex", flexDirection: "column", gap: 22, flex: 1 };
+function useDesktop() { return useMedia("(min-width: 900px)"); }
+
+// ═════════════════════════════════════════════════════════════
+// SCENE 2 · POTATO STICK CUP
+// ═════════════════════════════════════════════════════════════
+const P = { green: "#1E8A4C", greenDeep: "#0F3D25", greenLite: "#5FC27C", cream: "#F3DC8F", creamDeep: "#D9B85A", butter: "#FFF3BF", fleck: "#3E9A3A", red: "#E2503C" };
+
+function Stick({ w = 18, h = 110, style }) {
+  return (
+    <div style={{ width: w, height: h, borderRadius: 6, background: `radial-gradient(circle at 30% 20%, ${P.fleck} 0 1.3px, transparent 1.6px), radial-gradient(circle at 70% 55%, ${P.fleck} 0 1.2px, transparent 1.5px), linear-gradient(90deg, ${P.creamDeep}, ${P.cream} 35%, #FBEBB0 60%, ${P.creamDeep})`, backgroundSize: "18px 34px, 18px 34px, 100% 100%", boxShadow: "inset 0 -2px 0 rgba(120,80,0,.25), 0 2px 4px rgba(60,30,0,.15)", ...style }} />
+  );
+}
+
+function PotatoScene({ onBack }) {
+  const mk = () => Array.from({ length: 9 }, (_, i) => ({ id: i, x: -60 + i * 15 + rand(-4, 4), tilt: rand(-9, 9), lift: rand(-14, 6) }));
+  const [cupSticks, setCupSticks] = useState(mk);
+  const [tower, setTower] = useState([]);
+  const [flying, setFlying] = useState(null);
+  const [toppled, setToppled] = useState(false);
+  const [rattle, setRattle] = useState(false);
+  const [particles, setParticles] = useState([]);
+  const [count, setCount] = useState(0);
+  const idRef = useRef(100);
+
+  function pull(id) {
+    if (flying || toppled) return;
+    playCrunch();
+    const s = cupSticks.find((c) => c.id === id);
+    setFlying(s);
+    setCupSticks((p) => p.filter((c) => c.id !== id));
+    setTimeout(() => {
+      setTower((t) => [...t, { id: s.id, wob: rand(-3, 3) }]);
+      setCount((n) => n + 1);
+      setFlying(null);
+      setCupSticks((p) => [...p, { id: idRef.current++, x: s.x, tilt: rand(-9, 9), lift: rand(-14, 6), fresh: true }]);
+    }, 520);
+  }
+  useEffect(() => {
+    if (toppled || tower.length === 0) return;
+    if (tower.length >= 7 && Math.random() < (tower.length - 6) * 0.22) topple();
+  }, [tower.length]);
+  function topple() {
+    setToppled(true);
+    setParticles(Array.from({ length: 26 }, (_, i) => ({ id: i, x: rand(-160, 160), y: rand(-220, -40), r: rand(0, 360), s: rand(0.5, 1.2), d: rand(0, 0.25), kind: i % 5 === 0 ? "word" : i % 2 ? "fleck" : "crumb" })));
+  }
+  function reset() { setTower([]); setToppled(false); setParticles([]); }
+  function shake() { setRattle(true); setTimeout(() => setRattle(false), 500); }
+  const amp = toppled ? 0 : Math.min(tower.length, 6) * 0.9;
+
+  const desktop = useDesktop();
+  const areaRef = useRef(null);
+  const { w: aw, h: ah } = useSize(areaRef);
+  const k = desktop && aw && ah ? Math.max(1, Math.min(1.7, (aw - 48) / 760, (ah - 48) / 470)) : 1; // 플레이 영역을 화면에 맞춰 확대
+
+  const pattern = <div style={{ position: "absolute", inset: 0, backgroundImage: `linear-gradient(45deg, ${P.greenLite}22 25%, transparent 25%, transparent 75%, ${P.greenLite}22 75%), linear-gradient(45deg, ${P.greenLite}22 25%, transparent 25%, transparent 75%, ${P.greenLite}22 75%)`, backgroundSize: "40px 40px", backgroundPosition: "0 0, 20px 20px", opacity: 0.6, pointerEvents: "none" }} />;
+  const title = (
+    <div>
+      <h1 style={{ fontFamily: F.disp, fontSize: desktop ? "clamp(40px, 3.6vw, 56px)" : "clamp(34px, 7vw, 64px)", lineHeight: 1.05, margin: 0, color: P.green, textShadow: `3px 3px 0 ${P.cream}` }}>ポテト<br />スティック</h1>
+      <p style={{ margin: "10px 0 0", maxWidth: 300, fontSize: 14, lineHeight: 1.6, fontWeight: 500 }}>컵에서 스틱을 뽑아 탑을 쌓아 보세요. 높아질수록 흔들립니다.</p>
+    </div>
+  );
+  const score = (
+    <div style={{ textAlign: desktop ? "left" : "right" }}>
+      <div style={{ fontFamily: F.disp, fontSize: 44, color: P.red, lineHeight: 1 }}>{count}</div>
+      <div style={{ fontSize: 12, fontWeight: 700, letterSpacing: ".1em" }}>뽑은 스틱</div>
+    </div>
+  );
+  const status = toppled ? (
+    <>
+      <div style={{ fontFamily: F.disp, fontSize: 26, color: P.red, animation: "floaty 1.4s ease-in-out infinite" }}>くずれた！</div>
+      <button className="btn" onClick={reset} style={{ marginTop: 8, background: P.green, color: P.cream, boxShadow: `0 4px 0 ${P.greenDeep}` }}>다시 쌓기</button>
+    </>
+  ) : tower.length === 0 ? (
+    <div style={{ fontSize: 13, fontWeight: 700, color: P.green, animation: "floaty 1.6s ease-in-out infinite" }}>{desktop ? "스틱을 눌러 뽑기 →" : "← 스틱을 눌러 뽑기"}</div>
+  ) : (
+    <>
+      <div style={{ fontFamily: F.disp, fontSize: 26, color: P.green }}>{tower.length}층</div>
+      {tower.length >= 5 && <div style={{ fontSize: 12, fontWeight: 700, color: P.red }}>위태위태…</div>}
+      <button className="btn" onClick={topple} style={{ marginTop: 8, background: "transparent", color: P.green, border: `2px solid ${P.green}`, fontSize: 12, padding: "6px 14px" }}>무너뜨리기</button>
+    </>
+  );
+  const play = (
+    <main style={desktop
+      ? { position: "relative", display: "grid", gridTemplateColumns: "1fr 1fr", alignItems: "end", width: 760, height: 440, padding: "0 24px", transform: `scale(${k})`, transformOrigin: "center center", flexShrink: 0 }
+      : { position: "relative", display: "grid", gridTemplateColumns: "1fr 1fr", alignItems: "end", minHeight: 500, padding: "0 24px 40px", maxWidth: 900, margin: "0 auto" }}>
+      <div style={{ position: "relative", height: 420, display: "flex", justifyContent: "center", alignItems: "flex-end" }}>
+        <div onClick={shake} role="button" aria-label="컵 흔들기" style={{ position: "relative", width: 200, height: 260, animation: rattle ? "rattle .12s linear 4" : "none", cursor: "pointer" }}>
+          <div style={{ position: "absolute", left: "50%", top: -70, width: 0, height: 120 }}>
+            {cupSticks.map((s) => (
+              <button key={s.id} className="stickBtn" onClick={(e) => { e.stopPropagation(); pull(s.id); }} aria-label="스틱 뽑기" style={{ position: "absolute", left: s.x, top: s.lift, background: "none", border: 0, padding: 0, transform: `rotate(${s.tilt}deg)`, transformOrigin: "bottom center", animation: s.fresh ? "rise .45s cubic-bezier(.2,.9,.3,1.2)" : rattle ? "rattle .12s linear 4" : "none" }}>
+                <Stick />
+              </button>
+            ))}
+            {flying && <div style={{ position: "absolute", left: flying.x, top: flying.lift, "--dx": "300px", "--dy": `${20 - tower.length * 22}px`, animation: "fly .52s cubic-bezier(.3,.8,.4,1) forwards", pointerEvents: "none" }}><Stick /></div>}
+          </div>
+          <img src={CUP_IMG} alt="" draggable={false} style={{ position: "absolute", left: -10, bottom: 0, width: 220, maxWidth: "none", height: "auto", pointerEvents: "none" }} />
+        </div>
+      </div>
+
+      <div style={{ position: "relative", height: 420, display: "flex", justifyContent: "center", alignItems: "flex-end" }}>
+        <div style={{ position: "absolute", bottom: 0, width: 230, height: 22, borderRadius: "50%", background: "radial-gradient(ellipse at 50% 40%, #fff, #E8E1C5)", boxShadow: "0 6px 0 #C9C1A3, 0 10px 14px rgba(60,30,0,.15)" }} />
+        <div style={{ position: "absolute", bottom: 20, display: "flex", flexDirection: "column-reverse", alignItems: "center", "--amp": amp, animation: tower.length ? `wobble ${Math.max(0.6, 1.8 - tower.length * 0.15)}s ease-in-out infinite` : "none", transformOrigin: "bottom center" }}>
+          {tower.map((layer, i) => (
+            <div key={layer.id} style={{ marginTop: 2, display: "flex", gap: 10, animation: toppled ? "fall .7s cubic-bezier(.4,0,.8,1) forwards" : "none", "--x": `${rand(-140, 140)}px`, "--r": `${rand(-120, 120)}deg`, transform: `rotate(${layer.wob}deg)` }}>
+              {i % 2 === 0 ? <Stick w={110} h={18} style={{ background: `linear-gradient(180deg, ${P.creamDeep}, ${P.cream} 35%, #FBEBB0 60%, ${P.creamDeep})` }} /> : [0, 1, 2].map((k) => <Stick key={k} w={22} h={18} />)}
+            </div>
+          ))}
+        </div>
+        {particles.map((p) => (
+          <div key={p.id} style={{ position: "absolute", bottom: 60, left: "50%", "--x": `${p.x}px`, "--y": `${p.y}px`, "--r": `${p.r}deg`, "--s": p.s, animation: `pop 1.1s ease-out ${p.d}s forwards`, opacity: 0, pointerEvents: "none" }}>
+            {p.kind === "word" ? <span style={{ fontFamily: F.disp, color: P.red, fontSize: 18, textShadow: `2px 2px 0 ${P.cream}` }}>サラダ！</span> : p.kind === "fleck" ? <div style={{ width: 8, height: 8, borderRadius: 3, background: P.fleck }} /> : <div style={{ width: 12, height: 9, borderRadius: 3, background: P.cream, boxShadow: `inset 0 -2px 0 ${P.creamDeep}` }} />}
+          </div>
+        ))}
+        {!desktop && <div style={{ position: "absolute", top: 20, right: 0, textAlign: "right" }}>{status}</div>}
+      </div>
+    </main>
+  );
+
+  if (desktop) {
+    return (
+      <div className="scene" style={{ height: "100vh", display: "grid", gridTemplateColumns: GAME_COLS, background: P.butter, color: P.greenDeep, overflow: "hidden" }}>
+        <SidePanel bg="#FFF9DD" border={P.green} color={P.greenDeep}>
+          <TopBar index="03" color={P.green} onBack={onBack} />
+          <div style={PANEL_BODY}>
+            {title}
+            {score}
+            <div style={{ marginTop: "auto", padding: "16px 18px", background: "#fff", borderRadius: 12, border: `2px dashed ${P.green}` }}>{status}</div>
+          </div>
+        </SidePanel>
+        <section ref={areaRef} style={{ position: "relative", overflow: "hidden", display: "flex", alignItems: "center", justifyContent: "center" }}>
+          {pattern}
+          {play}
+        </section>
+      </div>
+    );
+  }
+  return (
+    <div className="scene" style={{ minHeight: "100vh", background: P.butter, color: P.greenDeep, overflow: "hidden", position: "relative" }}>
+      {pattern}
+      <TopBar index="03" color={P.green} onBack={onBack} />
+      <header style={{ position: "relative", padding: "12px 24px 0", display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: 12 }}>
+        {title}
+        {score}
+      </header>
+      {play}
+    </div>
+  );
+}
+
+// ═════════════════════════════════════════════════════════════
+// SCENE 3 · MUSHROOM CHOCOLATE HILL
+// ═════════════════════════════════════════════════════════════
+const M = { choco: "#3E2010", chocoLite: "#7A4620", stem: "#FFF3D6", stemDeep: "#E8D3A6", grass: "#8BC34A", grassDeep: "#5C9A2E", sky: "#FFD84A", dusk: "#F08A5D", night: "#2C2A5E", ink: "#5B3A1E" };
+
+function MushroomScene({ onBack }) {
+  const spots = useMemo(() => Array.from({ length: 8 }, (_, i) => ({ id: i, i, j: rand(-2, 2), y: i % 2 ? 18 : 42, size: rand(0.8, 1.25), delay: i * 0.12 })), []);
+  const [capped, setCapped] = useState(() => new Set());
+  const [t, setT] = useState(0.2); // 0 day → 1 night
+  const [seed, setSeed] = useState(0);
+  const eaten = capped.size;
+
+  function popCap(id) { playCrunch(); setCapped((s) => new Set(s).add(id)); }
+  function replant() { setCapped(new Set()); setSeed((s) => s + 1); }
+
+  const skyTop = t < 0.5 ? mix(M.sky, M.dusk, t * 2) : mix(M.dusk, M.night, (t - 0.5) * 2);
+  const skyBot = t < 0.5 ? mix("#FFF0A8", "#FFB98A", t * 2) : mix("#FFB98A", "#5B4A8A", (t - 0.5) * 2);
+
+  const desktop = useDesktop();
+  const k = desktop ? 1.55 : 1; // 데스크톱은 버섯을 크게
+  const onMove = (e) => { const r = e.currentTarget.getBoundingClientRect(); setT((e.clientX - r.left) / r.width); };
+  const onTouch = (e) => { const r = e.currentTarget.getBoundingClientRect(); setT((e.touches[0].clientX - r.left) / r.width); };
+  const skyBg = `linear-gradient(180deg, ${skyTop}, ${skyBot} 55%, ${M.grass} 55%)`;
+
+  const title = (
+    <div>
+      <h1 style={{ fontFamily: F.disp, fontSize: desktop ? "clamp(40px, 3.6vw, 56px)" : "clamp(34px, 7vw, 64px)", lineHeight: 1.05, margin: 0, color: M.choco, textShadow: `3px 3px 0 ${M.stem}` }}>きのこの<br />おか</h1>
+      <p style={{ margin: "10px 0 0", maxWidth: 300, fontSize: 14, lineHeight: 1.6, fontWeight: 700 }}>버섯을 누르면 초콜릿 갓이 톡 떨어집니다. 커서를 오른쪽으로 옮기면 밤이 와요.</p>
+    </div>
+  );
+  const score = (
+    <div style={{ textAlign: desktop ? "left" : "right" }}>
+      <div style={{ fontFamily: F.disp, fontSize: 44, color: M.choco, lineHeight: 1 }}>{eaten}<span style={{ fontSize: 18 }}>/{spots.length}</span></div>
+      <div style={{ fontSize: 12, fontWeight: 700, letterSpacing: ".1em" }}>먹은 갓</div>
+    </div>
+  );
+  const sun = <div style={{ position: "absolute", top: 60, left: `${12 + t * 70}%`, width: desktop ? 96 : 70, height: desktop ? 96 : 70, borderRadius: "50%", background: t > 0.6 ? "#FFF6CC" : "#FFF07A", boxShadow: t > 0.6 ? "0 0 40px #FFF6CC66" : "0 0 60px #FFE24A", transition: "all .3s" }} />;
+  const hill = (
+    <>
+      <div style={{ position: "absolute", left: "-10%", right: "-10%", bottom: 0, height: "46%", background: `radial-gradient(ellipse at 50% 100%, ${M.grass}, ${M.grassDeep})`, borderRadius: "50% 50% 0 0 / 40% 40% 0 0" }} />
+      <div key={seed} style={{ position: "absolute", left: 0, right: 0, bottom: 0, height: "46%" }}>
+        {spots.map((s) => {
+          const gone = capped.has(s.id);
+          return (
+            <div key={s.id} className="shroom" role="button" tabIndex={0} aria-label="버섯 갓 떼기" onClick={() => !gone && popCap(s.id)} onKeyDown={(e) => e.key === "Enter" && !gone && popCap(s.id)} style={{ position: "absolute", left: `${(desktop ? 6 + s.i * 10.5 : 8 + s.i * 12) + s.j}%`, bottom: `${s.y}%`, transform: `scale(${s.size * k})`, transformOrigin: "bottom center" }}>
+              <div style={{ position: "relative", width: 56, height: 90, animation: `sprout .6s cubic-bezier(.2,.9,.3,1.3) ${s.delay}s both`, transformOrigin: "bottom center" }}>
+                {/* cap */}
+                <div style={{ position: "absolute", top: 0, left: 0, width: 56, height: 40, borderRadius: "28px 28px 8px 8px", background: `linear-gradient(135deg, ${M.chocoLite}, ${M.choco} 60%)`, boxShadow: "inset 4px 4px 6px rgba(255,255,255,.18), 0 3px 0 #2A1508", animation: gone ? "capDrop .8s cubic-bezier(.5,0,.9,.6) forwards" : "none", "--x": `${rand(-40, 40)}px`, "--r": `${rand(-200, 200)}deg`, zIndex: 2 }} />
+                {/* stem */}
+                <div style={{ position: "absolute", top: 34, left: 15, width: 26, height: 56, borderRadius: "6px 6px 12px 12px", background: `linear-gradient(90deg, ${M.stemDeep}, ${M.stem} 45%, ${M.stemDeep})`, boxShadow: "inset 0 -4px 0 #D9C08C" }} />
+                {gone && <div style={{ position: "absolute", top: -22, left: 0, right: 0, textAlign: "center", fontFamily: F.disp, fontSize: 13, color: M.choco, animation: "floaty 1.2s ease-in-out infinite" }}>ぱくっ</div>}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </>
+  );
+  const box = <img src={MUSH_IMG} alt="" draggable={false} style={{ position: "absolute", right: 24, bottom: "8%", width: "clamp(140px, 22vw, 240px)", transform: "rotate(-6deg)", filter: "drop-shadow(0 10px 14px rgba(0,0,0,.25))", pointerEvents: "none" }} />;
+  const done = eaten === spots.length && (
+    <div style={{ position: "absolute", left: "50%", bottom: "12%", transform: "translateX(-50%)", textAlign: "center", animation: "fadeIn .4s both" }}>
+      <div style={{ fontFamily: F.disp, fontSize: 28, color: M.stem, textShadow: `2px 2px 0 ${M.choco}` }}>ぜんぶ たべた！</div>
+      <button className="btn" onClick={replant} style={{ marginTop: 10, background: M.choco, color: M.stem, boxShadow: "0 4px 0 #2A1508" }}>다시 심기</button>
+    </div>
+  );
+
+  if (desktop) {
+    return (
+      <div className="scene" style={{ height: "100vh", display: "grid", gridTemplateColumns: GAME_COLS, background: M.stem, color: M.ink, overflow: "hidden" }}>
+        <SidePanel bg={M.stem} border={M.choco} color={M.ink}>
+          <TopBar index="01" color={M.ink} onBack={onBack} />
+          <div style={PANEL_BODY}>
+            {title}
+            {score}
+            {/* 낮↔밤 표시 */}
+            <div style={{ marginTop: "auto", padding: "14px 18px", background: "#fff", borderRadius: 12, border: `2px dashed ${M.choco}` }}>
+              <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, fontWeight: 700 }}><span>☀ ひる</span><span>よる ☾</span></div>
+              <div style={{ position: "relative", height: 8, marginTop: 8, borderRadius: 99, background: `linear-gradient(90deg, ${M.sky}, ${M.dusk}, ${M.night})` }}>
+                <div style={{ position: "absolute", top: -4, left: `calc(${Math.max(0, Math.min(1, t)) * 100}% - 8px)`, width: 16, height: 16, borderRadius: "50%", background: "#fff", border: `3px solid ${M.choco}`, transition: "left .15s" }} />
+              </div>
+              <div style={{ marginTop: 8, fontSize: 11, fontWeight: 700, opacity: .75 }}>오른쪽 언덕 위에서 커서를 좌우로 움직여 보세요</div>
+            </div>
+          </div>
+        </SidePanel>
+        <section onMouseMove={onMove} onTouchMove={onTouch} style={{ position: "relative", overflow: "hidden", background: skyBg, transition: "background .3s" }}>
+          {sun}
+          {hill}
+          {box}
+          {done}
+        </section>
+      </div>
+    );
+  }
+  return (
+    <div className="scene" onMouseMove={onMove} onTouchMove={onTouch} style={{ minHeight: "100vh", background: skyBg, color: M.ink, position: "relative", overflow: "hidden", transition: "background .3s" }}>
+      {sun}
+      <TopBar index="01" color={M.ink} onBack={onBack} />
+      <header style={{ position: "relative", padding: "12px 24px 0", display: "flex", justifyContent: "space-between", flexWrap: "wrap", gap: 12 }}>
+        {title}
+        {score}
+      </header>
+      {hill}
+      {box}
+      {done}
+    </div>
+  );
+}
+
+// hex mix helper
+function mix(a, b, t) {
+  const p = (h) => [1, 3, 5].map((i) => parseInt(h.slice(i, i + 2), 16));
+  const [r1, g1, b1] = p(a), [r2, g2, b2] = p(b);
+  const c = (x, y) => Math.round(x + (y - x) * Math.min(1, Math.max(0, t)));
+  return `rgb(${c(r1, r2)},${c(g1, g2)},${c(b1, b2)})`;
+}
+
+// ═════════════════════════════════════════════════════════════
+// SCENE 4 · ANIMAL BISCUIT QUIZ
+// ═════════════════════════════════════════════════════════════
+const A = { pink: "#F04E7C", pinkDeep: "#B8244F", biscuit: "#EAC27A", biscuitDeep: "#C79A4C", yellow: "#FFF07A", ink: "#3A1A2A" };
+
+const ANIMALS = [
+  { name: "ELEPHANT", ko: "코끼리", img: BIS_ELEPHANT },
+  { name: "RABBIT", ko: "토끼", img: BIS_RABBIT },
+  { name: "DUCK", ko: "오리", img: BIS_DUCK },
+  { name: "CAT", ko: "고양이", img: BIS_CAT },
+  { name: "FISH", ko: "물고기", img: BIS_FISH },
+  { name: "TURTLE", ko: "거북이", img: BIS_TURTLE },
+];
+
+function AnimalsScene({ onBack }) {
+  const [order, setOrder] = useState(() => ANIMALS.map((_, i) => i).sort(() => Math.random() - 0.5));
+  const [idx, setIdx] = useState(0);
+  const [status, setStatus] = useState("ask"); // ask | right | wrong | done
+  const [score, setScore] = useState(0);
+  const [wrongPick, setWrongPick] = useState(null);
+  const current = ANIMALS[order[idx]];
+  const options = useMemo(() => {
+    const others = ANIMALS.filter((a) => a !== current).sort(() => Math.random() - 0.5).slice(0, 2);
+    return [current, ...others].sort(() => Math.random() - 0.5);
+  }, [idx, order]);
+
+  function pick(a) {
+    if (status !== "ask") return;
+    if (a === current) {
+      setStatus("right"); setScore((s) => s + 1);
+      setTimeout(() => {
+        if (idx + 1 >= order.length) setStatus("done");
+        else { setIdx((i) => i + 1); setStatus("ask"); }
+      }, 1000);
+    } else {
+      setWrongPick(a.name); setStatus("wrong");
+      setTimeout(() => { setStatus("ask"); setWrongPick(null); }, 500);
+    }
+  }
+  function restart() { setOrder(ANIMALS.map((_, i) => i).sort(() => Math.random() - 0.5)); setIdx(0); setScore(0); setStatus("ask"); }
+
+  const revealed = status === "right" || status === "done";
+
+  const desktop = useDesktop();
+  const title = (
+    <div>
+      <h1 style={{ fontFamily: F.disp, fontSize: desktop ? "clamp(40px, 3.6vw, 56px)" : "clamp(34px, 7vw, 64px)", lineHeight: 1.05, margin: 0, color: A.yellow, textShadow: `3px 3px 0 ${A.pinkDeep}` }}>どうぶつ<br />だあれ？</h1>
+      <p style={{ margin: "10px 0 0", maxWidth: 300, fontSize: 14, lineHeight: 1.6, fontWeight: 700 }}>비스킷 그림자만 보고 영어 이름을 맞혀 보세요. 맞히면 노릇하게 구워집니다.</p>
+    </div>
+  );
+  const scoreBox = (
+    <div style={{ textAlign: desktop ? "left" : "right" }}>
+      <div style={{ fontFamily: F.disp, fontSize: 44, color: A.yellow, lineHeight: 1 }}>{score}<span style={{ fontSize: 18 }}>/{ANIMALS.length}</span></div>
+      <div style={{ fontSize: 12, fontWeight: 700, letterSpacing: ".1em" }}>맞힌 비스킷</div>
+    </div>
+  );
+  const dots = <div style={{ position: "absolute", inset: 0, backgroundImage: "radial-gradient(#fff3 2px, transparent 2.5px)", backgroundSize: "28px 28px", pointerEvents: "none" }} />;
+  const bg = `radial-gradient(circle at 20% 10%, #FF7FA3, ${A.pink} 40%, ${A.pinkDeep})`;
+  const bisSize = desktop ? 320 : 220;
+  const quiz = status === "done" ? (
+    <div style={{ animation: "fadeIn .4s both" }}>
+      <div style={{ fontFamily: F.disp, fontSize: desktop ? 40 : 30, color: A.yellow }}>ぜんぶ せいかい！</div>
+      <div style={{ display: "flex", justifyContent: "center", gap: desktop ? 14 : 8, margin: "18px 0", flexWrap: "wrap" }}>
+        {ANIMALS.map((a) => <Biscuit key={a.name} animal={a} revealed size={desktop ? 110 : 72} />)}
+      </div>
+      <button className="btn" onClick={restart} style={{ background: A.yellow, color: A.ink, boxShadow: `0 4px 0 ${A.pinkDeep}` }}>한 상자 더</button>
+    </div>
+  ) : (
+    <>
+      <div key={idx} style={{ display: "inline-block", animation: status === "wrong" ? "shakeX .4s" : "fadeIn .35s both" }}>
+        <Biscuit animal={current} revealed={revealed} size={bisSize} />
+      </div>
+      <div style={{ display: "grid", gap: desktop ? 14 : 10, marginTop: desktop ? 30 : 22, gridTemplateColumns: desktop ? "repeat(3, minmax(150px, 210px))" : "1fr", justifyContent: "center" }}>
+        {options.map((a) => {
+          const isRight = revealed && a === current;
+          const isWrong = wrongPick === a.name;
+          return (
+            <button key={a.name} className="btn" onClick={() => pick(a)} style={{ background: isRight ? A.yellow : isWrong ? A.pinkDeep : "#fff", color: isRight ? A.ink : isWrong ? "#fff" : A.pinkDeep, fontFamily: F.disp, fontSize: 18, letterSpacing: ".12em", padding: "14px", boxShadow: `0 4px 0 ${A.pinkDeep}` }}>
+              {a.name}{isRight && <span style={{ fontFamily: F.body, fontSize: 12, marginLeft: 8 }}>{a.ko}</span>}
+            </button>
+          );
+        })}
+      </div>
+      <div style={{ marginTop: 14, fontSize: 12, fontWeight: 700, letterSpacing: ".12em", opacity: 0.85 }}>{idx + 1} / {ANIMALS.length}</div>
+    </>
+  );
+
+  if (desktop) {
+    return (
+      <div className="scene" style={{ height: "100vh", display: "grid", gridTemplateColumns: GAME_COLS, background: bg, color: "#fff", overflow: "hidden" }}>
+        <SidePanel bg={A.pinkDeep} border={A.yellow} color="#fff">
+          <TopBar index="02" color={A.pinkDeep} labelColor="#FFD1DE" onBack={onBack} />
+          <div style={PANEL_BODY}>
+            {title}
+            {scoreBox}
+            {/* 진행 상황 */}
+            <div style={{ display: "flex", gap: 6 }}>
+              {ANIMALS.map((_, i) => <div key={i} style={{ flex: 1, height: 8, borderRadius: 99, background: i < score ? A.yellow : "rgba(255,255,255,.25)", transition: "background .3s" }} />)}
+            </div>
+            <img src={ANIM_OPEN_IMG} alt="" draggable={false} style={{ marginTop: "auto", alignSelf: "flex-start", width: "min(70%, 220px)", transform: "rotate(-4deg)", filter: "drop-shadow(0 10px 14px rgba(0,0,0,.3))", pointerEvents: "none" }} />
+          </div>
+        </SidePanel>
+        <section style={{ position: "relative", overflow: "hidden", display: "flex", alignItems: "center", justifyContent: "center", padding: 32 }}>
+          {dots}
+          <main style={{ position: "relative", width: "100%", maxWidth: 760, textAlign: "center" }}>{quiz}</main>
+        </section>
+      </div>
+    );
+  }
+  return (
+    <div className="scene" style={{ minHeight: "100vh", background: bg, color: "#fff", position: "relative", overflow: "hidden" }}>
+      {dots}
+      <TopBar index="02" color={A.pinkDeep} onBack={onBack} />
+      <header style={{ position: "relative", padding: "12px 24px 0", display: "flex", justifyContent: "space-between", flexWrap: "wrap", gap: 12 }}>
+        {title}
+        {scoreBox}
+      </header>
+      <img src={ANIM_OPEN_IMG} alt="" draggable={false} style={{ position: "absolute", left: 16, bottom: 24, width: "clamp(110px, 16vw, 170px)", transform: "rotate(6deg)", filter: "drop-shadow(0 10px 14px rgba(0,0,0,.3))", pointerEvents: "none" }} />
+      <main style={{ position: "relative", maxWidth: 520, margin: "28px auto 0", padding: "0 24px 48px", textAlign: "center" }}>{quiz}</main>
+    </div>
+  );
+}
+
+// 2D PNG로 3D 느낌 내기: 포인터 위치 따라 틸트(rotateX/Y) + 같은 실루엣을 translateZ로 겹쳐 쌓아 두께 표현.
+// 실루엣 모드는 filter: brightness(0)로 검게, 정답이면 원본 색으로 돌아오며 한 바퀴 돈다.
+const BIS_DEPTH = 7; // 두께 레이어 수
+function Biscuit({ animal, revealed, size }) {
+  const [tilt, setTilt] = useState(null); // null = 자동 흔들림, {x,y} = 손으로 잡는 중
+  const [baking, setBaking] = useState(false);
+  const wasRevealed = useRef(revealed);
+  const boxRef = useRef(null);
+
+  // 방금 정답이 됐을 때만 굽기(회전) 연출
+  useEffect(() => {
+    const justBaked = revealed && !wasRevealed.current;
+    wasRevealed.current = revealed;
+    if (justBaked) { setBaking(true); const t = setTimeout(() => setBaking(false), 950); return () => clearTimeout(t); }
+  }, [revealed]);
+
+  function onMove(e) {
+    const r = boxRef.current.getBoundingClientRect();
+    const px = (e.clientX - r.left) / r.width - 0.5;   // -0.5 ~ 0.5
+    const py = (e.clientY - r.top) / r.height - 0.5;
+    setTilt({ x: -py * 40, y: px * 40 });                // 최대 ±20deg
+  }
+  function onLeave() { setTilt(null); }
+
+  const depthColor = revealed ? A.biscuitDeep : "#8A1A3D";
+  const layerStep = Math.max(1, size / 110); // 크기에 비례한 두께
+  const bodyClass = "bisBody" + (baking ? " bake" : tilt ? "" : " idle");
+  const bodyStyle = tilt ? { transform: `rotateX(${tilt.x}deg) rotateY(${tilt.y}deg)`, transition: "transform .08s" } : { transition: "transform .5s cubic-bezier(.2,.9,.3,1.2)" };
+
+  return (
+    <div ref={boxRef} className="bis" onPointerMove={onMove} onPointerLeave={onLeave} onPointerCancel={onLeave}
+      style={{ width: size, height: size, perspective: size * 3.2, filter: revealed ? "drop-shadow(0 14px 10px rgba(0,0,0,.25))" : "drop-shadow(0 12px 8px rgba(0,0,0,.35))" }}>
+      <div className={bodyClass} style={bodyStyle}>
+        {Array.from({ length: BIS_DEPTH }, (_, i) => (
+          <div key={i} className="bisLayer" style={{ background: depthColor, WebkitMaskImage: `url(${animal.img})`, maskImage: `url(${animal.img})`, transform: `translateZ(${-(i + 1) * layerStep}px)` }} />
+        ))}
+        <img className="bisFace" src={animal.img} alt={revealed ? animal.name : "비스킷 그림자"} draggable={false} style={{ filter: revealed ? "none" : "brightness(0)" }} />
+      </div>
+    </div>
+  );
+}
+
+// ═════════════════════════════════════════════════════════════
+// SCENE 0 · ENTRANCE (편의점 입구 — 문을 누르면 벨 + BGM과 함께 입장)
+// ═════════════════════════════════════════════════════════════
+function DoorPanel({ side, opened }) {
+  // side: "left" | "right" — 열리면 각자 바깥쪽으로 미끄러진다
+  return (
+    <div style={{ position: "absolute", top: 0, bottom: 0, [side]: 0, width: "50%", border: `6px solid ${FM.green}`, borderRadius: 4, background: "linear-gradient(115deg, rgba(255,255,255,.55) 0 18%, rgba(210,228,236,.35) 18% 40%, rgba(255,255,255,.25) 40% 55%, rgba(190,212,222,.35) 55%)", boxShadow: "inset 0 0 0 2px rgba(255,255,255,.5)", transition: "transform 1.1s cubic-bezier(.7,0,.3,1)", transform: opened ? `translateX(${side === "left" ? "-104%" : "104%"})` : "none", zIndex: 3, overflow: "hidden" }}>
+      {/* 세로 로고 (레퍼런스의 유리문 세로 글자) */}
+      {side === "right" && (
+        <div style={{ position: "absolute", top: 18, left: 12, writingMode: "vertical-rl", fontFamily: "'Noto Sans JP', sans-serif", fontWeight: 900, fontSize: 22, color: FM.green, letterSpacing: ".2em", textShadow: "0 1px 0 #fff" }}>おかしコンビニ</div>
+      )}
+      {/* 손잡이 바 */}
+      <div style={{ position: "absolute", top: "38%", bottom: "32%", [side === "left" ? "right" : "left"]: 10, width: 8, borderRadius: 4, background: "linear-gradient(90deg, #9AA5A1, #E8EDEB 50%, #9AA5A1)" }} />
+      {/* 유리에 붙은 포스터들 */}
+      {side === "left" && (
+        <>
+          <div style={{ position: "absolute", top: 20, left: 14, width: 58, padding: "6px 4px", background: "#FFEB3B", border: `2px solid ${A.pinkDeep}`, borderRadius: 3, transform: "rotate(-3deg)", textAlign: "center", fontFamily: "'Noto Sans JP', sans-serif", fontWeight: 900 }}>
+            <div style={{ fontSize: 9, color: A.pinkDeep }}>おかし</div>
+            <div style={{ fontSize: 14, color: "#D0021B" }}>セール</div>
+          </div>
+          <div style={{ position: "absolute", top: 96, left: 20, width: 50, padding: "5px 4px", background: "#fff", border: `2px solid ${FM.blue}`, borderRadius: 3, transform: "rotate(2deg)", textAlign: "center", fontFamily: "'Noto Sans JP', sans-serif", fontWeight: 900, fontSize: 9, color: FM.blue }}>新発売<br />🥔🍄🦁</div>
+        </>
+      )}
+    </div>
+  );
+}
+
+// 유리창 너머 매장 내부 — 천장등 + 선반 위 과자 (문이 열리면 불이 켜진다)
+function Interior({ lit, packages, pkgH = 64 }) {
+  const rows = packages ? [[CUP_IMG, ANIM_IMG, MUSH_IMG], [MUSH_IMG, CUP_IMG, ANIM_IMG]] : [];
+  return (
+    <div style={{ position: "absolute", inset: 0, background: `linear-gradient(180deg, #FFF9E8, ${FM.wall} 60%)`, filter: lit ? "brightness(1)" : "brightness(.62)", transition: "filter 1.1s" }}>
+      {/* 천장 형광등 */}
+      <div style={{ position: "absolute", top: 14, left: "8%", right: "8%", height: 8, borderRadius: 4, background: "#fff", boxShadow: lit ? "0 0 22px 8px rgba(255,255,255,.95)" : "0 1px 0 #C5CDCA", transition: "box-shadow 1.1s" }} />
+      {(packages ? [42, 72] : [28, 52, 76]).map((y, r) => (
+        <div key={y} style={{ position: "absolute", left: "8%", right: "8%", top: `${y}%`, height: 10, background: "#DDE3E0", boxShadow: "0 3px 0 #C5CDCA" }}>
+          {rows[r] && (
+            <div style={{ position: "absolute", left: 0, right: 0, bottom: 10, display: "flex", alignItems: "flex-end", justifyContent: "space-evenly" }}>
+              {rows[r].map((src, i) => <img key={i} src={src} alt="" style={{ height: pkgH + (i % 2) * Math.round(pkgH * .22), filter: "drop-shadow(0 2px 2px rgba(0,0,0,.2))" }} />)}
+            </div>
+          )}
+        </div>
+      ))}
+    </div>
+  );
+}
+
+// 데스크톱 전용 — 자동문 양옆의 큰 유리창 (포스터 + 하단 초록 띠)
+function StoreWindow({ side, lit }) {
+  const ref = useRef(null);
+  const { w } = useSize(ref);
+  const narrow = w > 0 && w < 320;           // 창이 좁으면 포스터 하나만
+  const pkgH = w ? Math.max(40, Math.min(96, Math.round(w * .19))) : 64;
+  const posterBase = { position: "absolute", fontFamily: "'Noto Sans JP', sans-serif", fontWeight: 900, textAlign: "center", borderRadius: 3, boxShadow: "0 2px 0 rgba(0,0,0,.15)" };
+  return (
+    <div ref={ref} style={{ position: "relative", marginTop: 14, border: "10px solid #9EAAB0", borderBottom: 0, borderRadius: "4px 4px 0 0", overflow: "hidden", background: "#B7C0BC", minWidth: 0 }}>
+      <Interior lit={lit} packages pkgH={pkgH} />
+      {/* 유리 반사 */}
+      <div style={{ position: "absolute", inset: 0, background: "linear-gradient(115deg, rgba(255,255,255,.45) 0 16%, rgba(210,228,236,.25) 16% 38%, rgba(255,255,255,.18) 38% 52%, rgba(190,212,222,.28) 52%)", pointerEvents: "none", zIndex: 2 }} />
+      {/* 창틀 세로 멀리언 */}
+      <div style={{ position: "absolute", top: 0, bottom: 0, left: "50%", width: 8, marginLeft: -4, background: "linear-gradient(90deg, #8F9A96, #E8EDEB 50%, #8F9A96)", zIndex: 3 }} />
+      {/* 하단 초록 띠 (브랜드 밴드) */}
+      <div style={{ position: "absolute", left: 0, right: 0, bottom: 0, height: "24%", background: FM.green, zIndex: 3, boxShadow: "inset 0 6px 0 #fff, inset 0 12px 0 " + FM.blue, overflow: "hidden" }}>
+        <div style={{ position: "absolute", left: 0, right: 0, top: "50%", transform: "translateY(-50%)", whiteSpace: "nowrap", color: "rgba(255,255,255,.85)", fontFamily: "'Noto Sans JP', sans-serif", fontWeight: 900, fontSize: 22, letterSpacing: ".28em", textAlign: "center", overflow: "hidden" }}>おかしコンビニ　おかしコンビニ　おかしコンビニ　おかしコンビニ</div>
+      </div>
+      {/* 포스터 */}
+      {side === "left" ? (
+        <>
+          <div style={{ ...posterBase, top: 48, left: narrow ? "50%" : "8%", marginLeft: narrow ? -75 : 0, width: 150, padding: "12px 10px 14px", background: A.yellow, border: `3px solid ${A.pinkDeep}`, transform: "rotate(-2.5deg)", zIndex: 4 }}>
+            <div style={{ fontSize: 13, color: A.pinkDeep, letterSpacing: ".1em" }}>おかし</div>
+            <div style={{ fontSize: 40, color: "#D0021B", lineHeight: 1 }}>セール</div>
+            <div style={{ fontSize: 11, color: A.pinkDeep, marginTop: 6 }}>ぜんぶ ¥100</div>
+          </div>
+          {!narrow && <div style={{ ...posterBase, top: 66, right: "10%", width: 104, padding: "10px 6px", background: "#fff", border: `3px solid ${FM.blue}`, transform: "rotate(2deg)", zIndex: 4, color: FM.blue }}>
+            <div style={{ fontSize: 16 }}>新発売</div>
+            <div style={{ fontSize: 22, marginTop: 4 }}>🥔🍄🦁</div>
+          </div>}
+        </>
+      ) : (
+        <>
+          <div style={{ ...posterBase, top: 50, left: narrow ? "50%" : "10%", marginLeft: narrow ? -59 : 0, width: 118, padding: "10px 8px 12px", background: "#fff", border: `3px solid ${FM.green}`, transform: "rotate(1.5deg)", zIndex: 4 }}>
+            <div style={{ fontSize: 11, color: FM.green, letterSpacing: ".12em" }}>あそびかた</div>
+            <div style={{ fontSize: 14, color: FM.ink, marginTop: 6, lineHeight: 1.4 }}>과자를 뜯으면<br />미니게임 시작!</div>
+          </div>
+          {!narrow && <div style={{ ...posterBase, top: 64, right: "9%", width: 96, padding: "8px 6px", background: FM.blue, color: "#fff", transform: "rotate(-2deg)", zIndex: 4 }}>
+            <div style={{ fontSize: 26, lineHeight: 1 }}>24H</div>
+            <div style={{ fontSize: 10, letterSpacing: ".14em", marginTop: 4 }}>年中無休</div>
+          </div>}
+        </>
+      )}
+    </div>
+  );
+}
+
+function Entrance({ onEnter }) {
+  const [opened, setOpened] = useState(false);
+  const desktop = useMedia("(min-width: 900px)");
+  function enter() {
+    if (opened) return;
+    setOpened(true);
+    playChimeThenBgm();
+    setTimeout(onEnter, 1200); // 문이 거의 열렸을 때 선반으로 전환
+  }
+  const signage = (
+    <div style={{ background: "#fff", padding: "16px 0 0", textAlign: "center", boxShadow: "0 4px 10px rgba(0,0,0,.12)", position: "relative", zIndex: 2, flexShrink: 0 }}>
+      <div style={{ display: "inline-flex", alignItems: "center", gap: 12 }}>
+        <div style={{ display: "flex", flexDirection: "column", gap: 3 }}>
+          <div style={{ width: 34, height: 15, background: FM.green, borderRadius: 2 }} />
+          <div style={{ width: 34, height: 15, background: FM.blue, borderRadius: 2 }} />
+        </div>
+        <div style={{ fontFamily: "'Noto Sans JP', sans-serif", fontWeight: 900, fontSize: "clamp(26px, 6vw, 44px)", color: FM.blue, letterSpacing: "-.01em" }}>おかしコンビニ</div>
+      </div>
+      <div style={{ marginTop: 12, height: 7, background: FM.green }} />
+      <div style={{ height: 7, background: "#fff" }} />
+      <div style={{ height: 7, background: FM.blue }} />
+    </div>
+  );
+  const door = (
+    <div onClick={enter} role="button" aria-label="편의점 입장" style={{ position: "absolute", inset: desktop ? "14px 0 0" : "0 4vw 7vh", cursor: opened ? "default" : "pointer" }}>
+      {/* 문 뒤로 보이는 매장 내부 (열리면 밝아짐) */}
+      <Interior lit={opened} />
+      <DoorPanel side="left" opened={opened} />
+      <DoorPanel side="right" opened={opened} />
+      {/* 입장 안내 */}
+      {!opened && (
+        <div style={{ position: "absolute", left: "50%", top: "58%", transform: "translateX(-50%)", zIndex: 4, background: FM.ink, color: "#fff", borderRadius: 99, padding: "12px 22px", fontWeight: 700, fontSize: 15, whiteSpace: "nowrap", boxShadow: "0 4px 14px rgba(0,0,0,.3)", animation: "floaty 1.6s ease-in-out infinite" }}>🔔 문을 눌러 입장하기</div>
+      )}
+      {/* 営業中 표지판 */}
+      <div style={{ position: "absolute", left: "50%", top: 14, transform: "translateX(-50%)", zIndex: 4, width: 74, background: "#fff", border: `2px solid ${FM.ink}`, borderRadius: 6, padding: "7px 0 6px", textAlign: "center", boxShadow: "0 2px 0 rgba(0,0,0,.2)", fontFamily: "'Noto Sans JP', sans-serif", opacity: opened ? 0 : 1, transition: "opacity .5s" }}>
+        <div style={{ fontWeight: 900, fontSize: 15, color: FM.green, lineHeight: 1 }}>営業中</div>
+        <div style={{ fontWeight: 900, fontSize: 9, color: FM.blue, letterSpacing: ".08em", marginTop: 3 }}>24時間</div>
+      </div>
+    </div>
+  );
+  const tileWall = (h) => (
+    <div style={{ flex: `0 0 ${h}`, background: "repeating-linear-gradient(0deg, #D9CFC0 0 26px, #C7BCAB 26px 29px), repeating-linear-gradient(90deg, transparent 0 54px, #C7BCAB55 54px 57px)" }} />
+  );
+
+  if (!desktop) {
+    return (
+      <div className="scene" style={{ minHeight: "100vh", background: "#CFD6D3", position: "relative", overflow: "hidden", display: "flex", flexDirection: "column" }}>
+        {tileWall("12vh")}
+        {signage}
+        {/* 유리문 구역 */}
+        <div style={{ flex: 1, position: "relative", background: "#B7C0BC", padding: "0 4vw" }}>
+          {door}
+          {/* 바닥 */}
+          <div style={{ position: "absolute", left: 0, right: 0, bottom: 0, height: "7vh", background: "linear-gradient(180deg, #8F9A96, #6F7A76)" }} />
+        </div>
+      </div>
+    );
+  }
+
+  // ── 데스크톱: [유리창 | 자동문 | 유리창] 파사드 + 보도 타일 ──
+  return (
+    <div className="scene" style={{ height: "100vh", background: "#CFD6D3", position: "relative", overflow: "hidden", display: "flex", flexDirection: "column" }}>
+      {tileWall("9vh")}
+      {signage}
+      <div style={{ flex: 1, minHeight: 0, position: "relative", background: "#B7C0BC", padding: "0 2.5vw", display: "grid", gridTemplateColumns: "1fr clamp(520px, 42vw, 720px) 1fr", columnGap: 14 }}>
+        {/* 타일 기둥 (양 끝) */}
+        {["left", "right"].map((s) => (
+          <div key={s} style={{ position: "absolute", top: 0, bottom: 0, [s]: 0, width: "2.5vw", background: "repeating-linear-gradient(0deg, #D9CFC0 0 26px, #C7BCAB 26px 29px)", boxShadow: s === "left" ? "inset -4px 0 8px rgba(0,0,0,.12)" : "inset 4px 0 8px rgba(0,0,0,.12)" }} />
+        ))}
+        <StoreWindow side="left" lit={opened} />
+        <div style={{ position: "relative" }}>{door}</div>
+        <StoreWindow side="right" lit={opened} />
+      </div>
+      {/* 보도: 킥플레이트 + 타일 */}
+      <div style={{ position: "relative", zIndex: 3, height: 72, flexShrink: 0, background: "linear-gradient(180deg, #8F9A96 0 10px, #DDE3E0 10px)", backgroundImage: "linear-gradient(180deg, #8F9A96 0 10px, transparent 10px), linear-gradient(90deg, rgba(0,0,0,.06) 1px, transparent 1px), linear-gradient(180deg, rgba(0,0,0,.06) 1px, transparent 1px)", backgroundSize: "100% 100%, 56px 56px, 56px 56px", boxShadow: "inset 0 10px 14px -8px rgba(0,0,0,.25)" }} />
+    </div>
+  );
+}
+
+// ═════════════════════════════════════════════════════════════
+// ROOT
+// ═════════════════════════════════════════════════════════════
+export default function SnackCorner() {
+  const [scene, setScene] = useState(() => new URLSearchParams(window.location.search).get("scene") || "entrance"); // ?scene=shelf 로 바로 진입 (개발용)
+  const back = () => setScene("shelf");
+  return (
+    <div style={{ fontFamily: F.body }}>
+      <style>{GLOBAL_CSS}</style>
+      {scene === "entrance" && <Entrance onEnter={back} />}
+      {scene === "shelf" && <Shelf onOpen={setScene} />}
+      {scene === "potato" && <PotatoScene onBack={back} />}
+      {scene === "mushroom" && <MushroomScene onBack={back} />}
+      {scene === "animals" && <AnimalsScene onBack={back} />}
+    </div>
+  );
+}
