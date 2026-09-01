@@ -94,9 +94,9 @@ function TopBar({ index, title, color, labelColor = FM.blue, onBack }) {
   return (
     <div style={{ display: "flex", alignItems: "center", gap: 12, padding: "18px 24px 0", position: "relative", zIndex: 2 }}>
       <button className="btn" onClick={onBack} style={{ background: FM.green, color: "#fff", boxShadow: `0 3px 0 ${FM.blue}`, fontSize: 13, whiteSpace: "nowrap", flexShrink: 0 }}>
-        ← 선반으로
+        ← 다른 과자 고르기
       </button>
-      <span style={{ fontSize: 12, letterSpacing: ".18em", fontWeight: 700, color: labelColor, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", minWidth: 0 }}>コンビニ おかしコーナー · {index}</span>
+      <span style={{ fontSize: 12, letterSpacing: ".18em", fontWeight: 700, color: labelColor, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", minWidth: 0 }}>{title || `コンビニ おかしコーナー · ${index}`}</span>
     </div>
   );
 }
@@ -543,6 +543,7 @@ function SidePanel({ bg, border, color, children }) {
   );
 }
 const PANEL_BODY = { padding: "18px 24px 26px", display: "flex", flexDirection: "column", gap: 22, flex: 1 };
+const PANEL_GROUP = { margin: "auto 0", display: "flex", flexDirection: "column", gap: 22 }; // 타이틀·설명·점수 묶음을 세로 가운데로
 function useDesktop() { return useMedia("(min-width: 900px)"); }
 
 // ═════════════════════════════════════════════════════════════
@@ -601,13 +602,14 @@ function PotatoScene({ onBack }) {
   const title = (
     <div>
       <h1 style={{ fontFamily: F.disp, fontSize: desktop ? "clamp(40px, 3.6vw, 56px)" : "clamp(34px, 7vw, 64px)", lineHeight: 1.05, margin: 0, color: P.green, textShadow: `3px 3px 0 ${P.cream}` }}>ポテト<br />スティック</h1>
-      <p style={{ margin: "10px 0 0", maxWidth: 300, fontSize: 14, lineHeight: 1.6, fontWeight: 500 }}>컵에서 스틱을 뽑아 탑을 쌓아 보세요. 높아질수록 흔들립니다.</p>
+      <div style={{ marginTop: desktop ? 16 : 8, fontSize: 13, fontWeight: 700, letterSpacing: ".18em", color: P.green, opacity: .8 }}>감자 스틱 탑 쌓기</div>
+      <p style={{ margin: desktop ? "34px 0 0" : "10px 0 0", maxWidth: 320, fontSize: desktop ? 17 : 14, lineHeight: desktop ? 1.85 : 1.6, fontWeight: 700, wordBreak: "keep-all" }}>컵에서 스틱을 뽑아 탑을 쌓아 보세요!<br />높이 쌓을수록 탑이 흔들려요. 컵을 톡 치면 스틱이 들썩입니다.</p>
     </div>
   );
   const score = (
     <div style={{ textAlign: desktop ? "left" : "right" }}>
-      <div style={{ fontFamily: F.disp, fontSize: 44, color: P.red, lineHeight: 1 }}>{count}</div>
-      <div style={{ fontSize: 12, fontWeight: 700, letterSpacing: ".1em" }}>뽑은 스틱</div>
+      <div style={{ fontFamily: F.disp, fontSize: desktop ? 60 : 44, color: P.red, lineHeight: 1 }}>{count}</div>
+      <div style={{ fontSize: desktop ? 15 : 12, fontWeight: 700, letterSpacing: ".1em", marginTop: desktop ? 4 : 0 }}>뽑은 스틱</div>
     </div>
   );
   const status = toppled ? (
@@ -665,10 +667,12 @@ function PotatoScene({ onBack }) {
     return (
       <div className="scene" style={{ height: "100vh", display: "grid", gridTemplateColumns: GAME_COLS, background: P.butter, color: P.greenDeep, overflow: "hidden" }}>
         <SidePanel bg="#FFF9DD" border={P.green} color={P.greenDeep}>
-          <TopBar index="03" color={P.green} onBack={onBack} />
-          <div style={PANEL_BODY}>
-            {title}
-            {score}
+          <TopBar index="03" title="じゃがりこ" color={P.green} onBack={onBack} />
+          <div style={{ ...PANEL_BODY, paddingLeft: 40 }}>
+            <div style={{ ...PANEL_GROUP, margin: "7vh 0 auto" }}>
+              {title}
+              {score}
+            </div>
             <div style={{ marginTop: "auto", padding: "16px 18px", background: "#fff", borderRadius: 12, border: `2px dashed ${P.green}` }}>{status}</div>
           </div>
         </SidePanel>
@@ -719,13 +723,14 @@ function MushroomScene({ onBack }) {
   const title = (
     <div>
       <h1 style={{ fontFamily: F.disp, fontSize: desktop ? "clamp(40px, 3.6vw, 56px)" : "clamp(34px, 7vw, 64px)", lineHeight: 1.05, margin: 0, color: M.choco, textShadow: `3px 3px 0 ${M.stem}` }}>きのこの<br />おか</h1>
-      <p style={{ margin: "10px 0 0", maxWidth: 300, fontSize: 14, lineHeight: 1.6, fontWeight: 700 }}>버섯을 누르면 초콜릿 갓이 톡 떨어집니다. 커서를 오른쪽으로 옮기면 밤이 와요.</p>
+      <div style={{ marginTop: desktop ? 16 : 8, fontSize: 13, fontWeight: 700, letterSpacing: ".18em", color: M.choco, opacity: .75 }}>버섯 언덕</div>
+      <p style={{ margin: desktop ? "34px 0 0" : "10px 0 0", maxWidth: 320, fontSize: desktop ? 17 : 14, lineHeight: desktop ? 1.85 : 1.6, fontWeight: 700, wordBreak: "keep-all" }}>버섯을 누르면 초콜릿 갓이 톡 떨어져요!<br />커서를 오른쪽으로 옮기면 밤이 찾아옵니다. 여덟 개를 다 먹어 보세요.</p>
     </div>
   );
   const score = (
     <div style={{ textAlign: desktop ? "left" : "right" }}>
-      <div style={{ fontFamily: F.disp, fontSize: 44, color: M.choco, lineHeight: 1 }}>{eaten}<span style={{ fontSize: 18 }}>/{spots.length}</span></div>
-      <div style={{ fontSize: 12, fontWeight: 700, letterSpacing: ".1em" }}>먹은 갓</div>
+      <div style={{ fontFamily: F.disp, fontSize: desktop ? 60 : 44, color: M.choco, lineHeight: 1 }}>{eaten}<span style={{ fontSize: desktop ? 24 : 18 }}>/{spots.length}</span></div>
+      <div style={{ fontSize: desktop ? 15 : 12, fontWeight: 700, letterSpacing: ".1em", marginTop: desktop ? 4 : 0 }}>먹은 갓</div>
     </div>
   );
   const sun = <div style={{ position: "absolute", top: 60, left: `${12 + t * 70}%`, width: desktop ? 96 : 70, height: desktop ? 96 : 70, borderRadius: "50%", background: t > 0.6 ? "#FFF6CC" : "#FFF07A", boxShadow: t > 0.6 ? "0 0 40px #FFF6CC66" : "0 0 60px #FFE24A", transition: "all .3s" }} />;
@@ -736,7 +741,7 @@ function MushroomScene({ onBack }) {
         {spots.map((s) => {
           const gone = capped.has(s.id);
           return (
-            <div key={s.id} className="shroom" role="button" tabIndex={0} aria-label="버섯 갓 떼기" onClick={() => !gone && popCap(s.id)} onKeyDown={(e) => e.key === "Enter" && !gone && popCap(s.id)} style={{ position: "absolute", left: `${(desktop ? 6 + s.i * 10.5 : 8 + s.i * 12) + s.j}%`, bottom: `${s.y}%`, transform: `scale(${s.size * k})`, transformOrigin: "bottom center" }}>
+            <div key={s.id} className="shroom" role="button" tabIndex={0} aria-label="버섯 갓 떼기" onClick={() => !gone && popCap(s.id)} onKeyDown={(e) => e.key === "Enter" && !gone && popCap(s.id)} style={{ position: "absolute", left: `${(desktop ? 4 + s.i * 8.8 : 8 + s.i * 12) + s.j}%`, bottom: `${s.y}%`, transform: `scale(${s.size * k})`, transformOrigin: "bottom center" }}>
               <div style={{ position: "relative", width: 56, height: 90, animation: `sprout .6s cubic-bezier(.2,.9,.3,1.3) ${s.delay}s both`, transformOrigin: "bottom center" }}>
                 {/* cap */}
                 <div style={{ position: "absolute", top: 0, left: 0, width: 56, height: 40, borderRadius: "28px 28px 8px 8px", background: `linear-gradient(135deg, ${M.chocoLite}, ${M.choco} 60%)`, boxShadow: "inset 4px 4px 6px rgba(255,255,255,.18), 0 3px 0 #2A1508", animation: gone ? "capDrop .8s cubic-bezier(.5,0,.9,.6) forwards" : "none", "--x": `${rand(-40, 40)}px`, "--r": `${rand(-200, 200)}deg`, zIndex: 2 }} />
@@ -750,7 +755,7 @@ function MushroomScene({ onBack }) {
       </div>
     </>
   );
-  const box = <img src={MUSH_IMG} alt="" draggable={false} style={{ position: "absolute", right: 24, bottom: "8%", width: "clamp(140px, 22vw, 240px)", transform: "rotate(-6deg)", filter: "drop-shadow(0 10px 14px rgba(0,0,0,.25))", pointerEvents: "none" }} />;
+  const box = <img src={MUSH_IMG} alt="" draggable={false} style={{ position: "absolute", right: 24, bottom: "8%", width: desktop ? "clamp(150px, 15vw, 210px)" : "clamp(140px, 22vw, 240px)", transform: "rotate(-6deg)", filter: "drop-shadow(0 10px 14px rgba(0,0,0,.25))", pointerEvents: "none" }} />;
   const done = eaten === spots.length && (
     <div style={{ position: "absolute", left: "50%", bottom: "12%", transform: "translateX(-50%)", textAlign: "center", animation: "fadeIn .4s both" }}>
       <div style={{ fontFamily: F.disp, fontSize: 28, color: M.stem, textShadow: `2px 2px 0 ${M.choco}` }}>ぜんぶ たべた！</div>
@@ -762,10 +767,12 @@ function MushroomScene({ onBack }) {
     return (
       <div className="scene" style={{ height: "100vh", display: "grid", gridTemplateColumns: GAME_COLS, background: M.stem, color: M.ink, overflow: "hidden" }}>
         <SidePanel bg={M.stem} border={M.choco} color={M.ink}>
-          <TopBar index="01" color={M.ink} onBack={onBack} />
-          <div style={PANEL_BODY}>
-            {title}
-            {score}
+          <TopBar index="01" title="きのこの山" color={M.ink} onBack={onBack} />
+          <div style={{ ...PANEL_BODY, paddingLeft: 40 }}>
+            <div style={{ ...PANEL_GROUP, margin: "7vh 0 auto" }}>
+              {title}
+              {score}
+            </div>
             {/* 낮↔밤 표시 */}
             <div style={{ marginTop: "auto", padding: "14px 18px", background: "#fff", borderRadius: 12, border: `2px dashed ${M.choco}` }}>
               <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, fontWeight: 700 }}><span>☀ ひる</span><span>よる ☾</span></div>
@@ -855,13 +862,14 @@ function AnimalsScene({ onBack }) {
   const title = (
     <div>
       <h1 style={{ fontFamily: F.disp, fontSize: desktop ? "clamp(40px, 3.6vw, 56px)" : "clamp(34px, 7vw, 64px)", lineHeight: 1.05, margin: 0, color: A.yellow, textShadow: `3px 3px 0 ${A.pinkDeep}` }}>どうぶつ<br />だあれ？</h1>
-      <p style={{ margin: "10px 0 0", maxWidth: 300, fontSize: 14, lineHeight: 1.6, fontWeight: 700 }}>비스킷 그림자만 보고 영어 이름을 맞혀 보세요. 맞히면 노릇하게 구워집니다.</p>
+      <div style={{ marginTop: desktop ? 16 : 8, fontSize: 13, fontWeight: 700, letterSpacing: ".18em", color: "rgba(255,255,255,.75)" }}>어떤 동물일까?</div>
+      <p style={{ margin: desktop ? "34px 0 0" : "10px 0 0", maxWidth: 320, fontSize: desktop ? 17 : 14, lineHeight: desktop ? 1.85 : 1.6, fontWeight: 700, wordBreak: "keep-all" }}>그림자를 보고 동물을 맞혀 보세요!<br />잡고 돌려 보며 살펴본 뒤 정답을 골라주세요. 정답이면 노릇하게 구워져요!</p>
     </div>
   );
   const scoreBox = (
     <div style={{ textAlign: desktop ? "left" : "right" }}>
-      <div style={{ fontFamily: F.disp, fontSize: 44, color: A.yellow, lineHeight: 1 }}>{score}<span style={{ fontSize: 18 }}>/{ANIMALS.length}</span></div>
-      <div style={{ fontSize: 12, fontWeight: 700, letterSpacing: ".1em" }}>맞힌 비스킷</div>
+      <div style={{ fontFamily: F.disp, fontSize: desktop ? 60 : 44, color: A.yellow, lineHeight: 1 }}>{score}<span style={{ fontSize: desktop ? 24 : 18 }}>/{ANIMALS.length}</span></div>
+      <div style={{ fontSize: desktop ? 15 : 12, fontWeight: 700, letterSpacing: ".1em", marginTop: desktop ? 4 : 0 }}>맞힌 비스킷</div>
     </div>
   );
   const dots = <div style={{ position: "absolute", inset: 0, backgroundImage: "radial-gradient(#fff3 2px, transparent 2.5px)", backgroundSize: "28px 28px", pointerEvents: "none" }} />;
@@ -870,10 +878,11 @@ function AnimalsScene({ onBack }) {
   const quiz = status === "done" ? (
     <div style={{ animation: "fadeIn .4s both" }}>
       <div style={{ fontFamily: F.disp, fontSize: desktop ? 40 : 30, color: A.yellow }}>ぜんぶ せいかい！</div>
+      <div style={{ marginTop: 6, fontSize: desktop ? 15 : 13, fontWeight: 700, letterSpacing: ".16em", color: "rgba(255,255,255,.85)" }}>전부 정답!</div>
       <div style={{ display: "flex", justifyContent: "center", gap: desktop ? 14 : 8, margin: "18px 0", flexWrap: "wrap" }}>
         {ANIMALS.map((a) => <Biscuit key={a.name} animal={a} revealed size={desktop ? 110 : 72} />)}
       </div>
-      <button className="btn" onClick={restart} style={{ background: A.yellow, color: A.ink, boxShadow: `0 4px 0 ${A.pinkDeep}` }}>한 상자 더</button>
+      <button className="btn" onClick={restart} style={{ background: A.yellow, color: A.ink, boxShadow: `0 5px 0 ${A.pinkDeep}`, fontFamily: F.disp, fontSize: desktop ? 22 : 17, padding: desktop ? "16px 40px" : "12px 28px", marginTop: desktop ? 10 : 0 }}>한 상자 더</button>
     </div>
   ) : (
     <>
@@ -885,13 +894,13 @@ function AnimalsScene({ onBack }) {
           const isRight = revealed && a === current;
           const isWrong = wrongPick === a.name;
           return (
-            <button key={a.name} className="btn" onClick={() => pick(a)} style={{ background: isRight ? A.yellow : isWrong ? A.pinkDeep : "#fff", color: isRight ? A.ink : isWrong ? "#fff" : A.pinkDeep, fontFamily: F.disp, fontSize: 18, letterSpacing: ".12em", padding: "14px", boxShadow: `0 4px 0 ${A.pinkDeep}` }}>
-              {a.name}{isRight && <span style={{ fontFamily: F.body, fontSize: 12, marginLeft: 8 }}>{a.ko}</span>}
+            <button key={a.name} className="btn" onClick={() => pick(a)} style={{ background: isRight ? A.yellow : isWrong ? A.pinkDeep : "#fff", color: isRight ? A.ink : isWrong ? "#fff" : A.pinkDeep, fontFamily: F.disp, fontSize: 18, letterSpacing: ".12em", padding: "14px", boxShadow: `0 4px 0 ${A.pinkDeep}`, whiteSpace: "nowrap", alignSelf: "start" }}>
+              {a.name}{isRight && <span style={{ display: "block", fontFamily: F.body, fontSize: 12, letterSpacing: 0, marginTop: 2, wordBreak: "keep-all", whiteSpace: "nowrap" }}>{a.ko}</span>}
             </button>
           );
         })}
       </div>
-      <div style={{ marginTop: 14, fontSize: 12, fontWeight: 700, letterSpacing: ".12em", opacity: 0.85 }}>{idx + 1} / {ANIMALS.length}</div>
+      <div style={{ marginTop: desktop ? 26 : 16, fontFamily: F.disp, fontSize: desktop ? 26 : 20, letterSpacing: ".14em", color: A.yellow, textShadow: `2px 2px 0 ${A.pinkDeep}` }}>{idx + 1} / {ANIMALS.length}</div>
     </>
   );
 
@@ -899,15 +908,24 @@ function AnimalsScene({ onBack }) {
     return (
       <div className="scene" style={{ height: "100vh", display: "grid", gridTemplateColumns: GAME_COLS, background: bg, color: "#fff", overflow: "hidden" }}>
         <SidePanel bg={A.pinkDeep} border={A.yellow} color="#fff">
-          <TopBar index="02" color={A.pinkDeep} labelColor="#FFD1DE" onBack={onBack} />
-          <div style={PANEL_BODY}>
-            {title}
-            {scoreBox}
-            {/* 진행 상황 */}
-            <div style={{ display: "flex", gap: 6 }}>
-              {ANIMALS.map((_, i) => <div key={i} style={{ flex: 1, height: 8, borderRadius: 99, background: i < score ? A.yellow : "rgba(255,255,255,.25)", transition: "background .3s" }} />)}
+          <TopBar index="02" title="たべっ子どうぶつ" color={A.pinkDeep} labelColor="#FFD1DE" onBack={onBack} />
+          <div style={{ ...PANEL_BODY, paddingLeft: 40 }}>
+            <div style={{ ...PANEL_GROUP, margin: "7vh 0 auto" }}>
+              {title}
+              {scoreBox}
+              {/* 진행 상황 — 출제 순서대로 비스킷이 구워진다 */}
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 10, justifyItems: "center", width: "100%", maxWidth: 340, alignSelf: "center", marginTop: 14 }}>
+                {order.map((ai, i) => {
+                  const baked = i < score;
+                  const now = i === idx && status !== "done";
+                  return (
+                    <div key={ai} style={{ width: "100%", aspectRatio: "1", maxWidth: 96, display: "flex", alignItems: "center", justifyContent: "center", borderRadius: 16, background: now ? "rgba(255,255,255,.14)" : "transparent", boxShadow: now ? `inset 0 0 0 2px ${A.yellow}` : "none", transition: "background .3s, box-shadow .3s" }}>
+                      <img src={ANIMALS[ai].img} alt={baked ? ANIMALS[ai].name : ""} draggable={false} style={{ width: "80%", height: "80%", objectFit: "contain", filter: baked ? "drop-shadow(0 2px 0 rgba(0,0,0,.25))" : "brightness(0)", opacity: baked ? 1 : 0.45, transform: baked ? "scale(1)" : "scale(.88)", transition: "filter .5s, opacity .5s, transform .4s cubic-bezier(.3,1.4,.5,1)" }} />
             </div>
-            <img src={ANIM_OPEN_IMG} alt="" draggable={false} style={{ marginTop: "auto", alignSelf: "flex-start", width: "min(70%, 220px)", transform: "rotate(-4deg)", filter: "drop-shadow(0 10px 14px rgba(0,0,0,.3))", pointerEvents: "none" }} />
+                  );
+                })}
+              </div>
+            </div>
           </div>
         </SidePanel>
         <section style={{ position: "relative", overflow: "hidden", display: "flex", alignItems: "center", justifyContent: "center", padding: 32 }}>
@@ -925,7 +943,6 @@ function AnimalsScene({ onBack }) {
         {title}
         {scoreBox}
       </header>
-      <img src={ANIM_OPEN_IMG} alt="" draggable={false} style={{ position: "absolute", left: 16, bottom: 24, width: "clamp(110px, 16vw, 170px)", transform: "rotate(6deg)", filter: "drop-shadow(0 10px 14px rgba(0,0,0,.3))", pointerEvents: "none" }} />
       <main style={{ position: "relative", maxWidth: 520, margin: "28px auto 0", padding: "0 24px 48px", textAlign: "center" }}>{quiz}</main>
     </div>
   );
