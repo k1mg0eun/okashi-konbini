@@ -2,6 +2,9 @@ import { useState, useEffect, useRef, useMemo } from "react";
 import { playChimeThenBgm, playCrunch } from "./sounds.js";
 import CUP_IMG from "./assets/cup.png";
 import CUP_OPEN_IMG from "./assets/cup-open.png";
+import CUP_REAL_IMG from "./assets/cup-real.png"; // 실제 컵 사진 (살짝 위에서, 배경 투명)
+import STICK_IMG from "./assets/stick.png";       // 스틱 한 개 (140×800, 배경 투명)
+import PLATE_IMG from "./assets/plate.png";       // 접시 (1028×397, 배경 투명)
 import MUSH_IMG from "./assets/mushroom.png";
 import MUSH_OPEN_IMG from "./assets/mushroom-open.png";
 import ANIM_IMG from "./assets/animals.png";
@@ -78,8 +81,9 @@ const GLOBAL_CSS = `
   .tierScroll { scrollbar-width: none; -webkit-overflow-scrolling: touch; cursor: grab; }
   .tierScroll:active { cursor: grabbing; }
   .tierScroll::-webkit-scrollbar { display: none; }
-  .stickBtn { cursor: grab; transition: transform .18s; }
-  .stickBtn:hover, .stickBtn:focus-visible { transform: translateY(-18px) !important; outline: none; }
+  .stickBtn { cursor: grab; transition: transform .18s; display: block; background: none; border: 0; padding: 0; }
+  .stickBtn:hover, .stickBtn:focus-visible { transform: translateY(-22px); outline: none; }
+  .stickImg { display: block; pointer-events: none; user-select: none; -webkit-user-drag: none; filter: drop-shadow(0 3px 3px rgba(60,30,0,.25)); }
   .shroom { cursor: pointer; transform-origin: bottom center; transition: transform .2s; }
   .shroom:hover, .shroom:focus-visible { animation: wiggle .5s ease-in-out infinite; outline: none; }
   .boxBtn { cursor: pointer; transition: transform .25s cubic-bezier(.2,.9,.3,1.3); transform-origin: bottom center; background: none; border: 0; padding: 0; font-family: inherit; }
@@ -90,13 +94,12 @@ const GLOBAL_CSS = `
 `;
 
 // ── generic chrome ───────────────────────────────────────────
-function TopBar({ index, title, color, labelColor = FM.blue, onBack }) {
+function TopBar({ onBack }) {
   return (
     <div style={{ display: "flex", alignItems: "center", gap: 12, padding: "18px 24px 0", position: "relative", zIndex: 2 }}>
       <button className="btn" onClick={onBack} style={{ background: FM.green, color: "#fff", boxShadow: `0 3px 0 ${FM.blue}`, fontSize: 13, whiteSpace: "nowrap", flexShrink: 0 }}>
         ← 다른 과자 고르기
       </button>
-      <span style={{ fontSize: 12, letterSpacing: ".18em", fontWeight: 700, color: labelColor, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", minWidth: 0 }}>{title || `コンビニ おかしコーナー · ${index}`}</span>
     </div>
   );
 }
@@ -557,10 +560,61 @@ function Stick({ w = 18, h = 110, style }) {
   );
 }
 
+// 컵 사진(847×913, 정면) — 표시 폭 기준으로 환산. cy = 컵 윗선, rx = 윗선 반폭. 스틱은 컵 뒤에 서서 윗선 위로만 보인다
+const CUP_W = 250, CUP_S = CUP_W / 847;
+const CUP = { w: CUP_W, h: Math.round(913 * CUP_S), cx: 425 * CUP_S, cy: 18 * CUP_S, rx: 414 * CUP_S };
+// 접시 사진 — 표시 폭 330px. 안쪽 평평한 면의 중심(위에서 52%)에 탑 밑바닥을 놓는다
+const PLATE_W = 330, PLATE_H = Math.round(PLATE_W * 397 / 1028), PLATE_TOP_Y = Math.round(PLATE_H * 0.52), TOWER_BOTTOM = PLATE_H - PLATE_TOP_Y;
+const STICK_H = 150, STICK_W = Math.round(STICK_H * 140 / 800); // 스틱 사진 비율 유지 (굵기 ≈ 컵 폭의 1/9)
+// 컵 속 스틱 배치: 뒤·중간·앞 세 줄로 입구를 채운다 (base = 입구 타원 중심 기준 아랫단 y, z = 깊이)
+const CUP_ROWS = [{ base: -9, n: 7 }, { base: 0, n: 7 }, { base: 9, n: 6 }];
+function mkStick(id, row, i) {
+  const r = CUP_ROWS[row], span = CUP.rx * 0.74 * 2;
+  return { id, row, i, x: -CUP.rx * 0.74 + (r.n === 1 ? span / 2 : i * span / (r.n - 1)) + rand(-5, 5) - STICK_W / 2, top: r.base - rand(46, 80), tilt: rand(-4, 4) + (i - (r.n - 1) / 2) * 2.2, flip: Math.random() < .5 };
+}
+
+// 스틱 사진 — 세로(컵 안·탑 가로층은 회전)와 단면(탑 교차층) 두 가지로 쓴다
+function StickImg({ h = STICK_H, style }) {
+  return <img className="stickImg" src={STICK_IMG} alt="" draggable={false} style={{ height: h, width: Math.round(h * 140 / 800), ...style }} />;
+}
+function StickSide({ w = 110, h = 20 }) { // 가로로 눕힌 스틱
+  return (
+    <div style={{ width: w, height: h, display: "flex", alignItems: "center", justifyContent: "center" }}>
+      <StickImg h={w} style={{ transform: "rotate(90deg)", flexShrink: 0 }} />
+    </div>
+  );
+}
+// 스틱 3D — 비스킷과 같은 방식: 같은 실루엣을 translateZ로 겹쳐 두께를 내고, 포인터 위치에 따라 기울인다
+const STICK_DEPTH = 5;
+function Stick3D({ h = STICK_H, flip }) {
+  const [tilt, setTilt] = useState(null);
+  const ref = useRef(null);
+  const w = Math.round(h * 140 / 800);
+  function onMove(e) {
+    const r = ref.current.getBoundingClientRect();
+    const px = (e.clientX - r.left) / r.width - .5, py = (e.clientY - r.top) / r.height - .5;
+    setTilt({ x: -py * 28, y: px * 56 });
+  }
+  const body = tilt ? { transform: `rotateX(${tilt.x}deg) rotateY(${tilt.y}deg)`, transition: "transform .08s" } : { transition: "transform .5s cubic-bezier(.2,.9,.3,1.2)" };
+  return (
+    <div ref={ref} onPointerMove={onMove} onPointerLeave={() => setTilt(null)} onPointerCancel={() => setTilt(null)} style={{ position: "relative", width: w, height: h, perspective: h * 2.5, filter: "drop-shadow(0 3px 3px rgba(60,30,0,.25))" }}>
+      <div style={{ position: "absolute", inset: 0, transformStyle: "preserve-3d", ...body }}>
+        {Array.from({ length: STICK_DEPTH }, (_, i) => (
+          <div key={i} className="bisLayer" style={{ background: "#CFAE5E", WebkitMaskImage: `url(${STICK_IMG})`, maskImage: `url(${STICK_IMG})`, transform: `translateZ(${-(i + 1) * 2}px)` }} />
+        ))}
+        <img src={STICK_IMG} alt="" draggable={false} style={{ position: "absolute", inset: 0, width: "100%", height: "100%", pointerEvents: "none", userSelect: "none", transform: flip ? "scaleX(-1)" : "none" }} />
+      </div>
+    </div>
+  );
+}
+function StickEnd({ w = 24, h = 20 }) { // 앞을 보고 있는 스틱 토막 (단면)
+  return <img className="stickImg" src={STICK_IMG} alt="" draggable={false} style={{ width: w, height: h, objectFit: "cover", objectPosition: "50% 40%", borderRadius: "45%", boxShadow: "inset 0 0 0 2px rgba(120,80,0,.25)" }} />;
+}
+
 function PotatoScene({ onBack }) {
-  const mk = () => Array.from({ length: 9 }, (_, i) => ({ id: i, x: -60 + i * 15 + rand(-4, 4), tilt: rand(-9, 9), lift: rand(-14, 6) }));
+  const mk = () => CUP_ROWS.flatMap((r, row) => Array.from({ length: r.n }, (_, i) => mkStick(row * 10 + i, row, i)));
   const [cupSticks, setCupSticks] = useState(mk);
-  const [tower, setTower] = useState([]);
+  const [tower, setTower] = useState(() => { const n = +new URLSearchParams(window.location.search).get("tower") || 0; return Array.from({ length: n }, (_, i) => ({ id: -1 - i, wob: rand(-3, 3) })); }); // ?tower=5 로 쌓인 상태 확인 (개발용)
   const [flying, setFlying] = useState(null);
   const [toppled, setToppled] = useState(false);
   const [rattle, setRattle] = useState(false);
@@ -578,7 +632,7 @@ function PotatoScene({ onBack }) {
       setTower((t) => [...t, { id: s.id, wob: rand(-3, 3) }]);
       setCount((n) => n + 1);
       setFlying(null);
-      setCupSticks((p) => [...p, { id: idRef.current++, x: s.x, tilt: rand(-9, 9), lift: rand(-14, 6), fresh: true }]);
+      setCupSticks((p) => [...p, { ...mkStick(idRef.current++, s.row, s.i), fresh: true }]);
     }, 520);
   }
   useEffect(() => {
@@ -614,16 +668,17 @@ function PotatoScene({ onBack }) {
   );
   const status = toppled ? (
     <>
-      <div style={{ fontFamily: F.disp, fontSize: 26, color: P.red, animation: "floaty 1.4s ease-in-out infinite" }}>くずれた！</div>
-      <button className="btn" onClick={reset} style={{ marginTop: 8, background: P.green, color: P.cream, boxShadow: `0 4px 0 ${P.greenDeep}` }}>다시 쌓기</button>
+      <div style={{ fontFamily: F.disp, fontSize: desktop ? 34 : 26, color: P.red, animation: "floaty 1.4s ease-in-out infinite" }}>くずれた！</div>
+      <div style={{ marginTop: 6, fontSize: desktop ? 16 : 13, fontWeight: 700, letterSpacing: ".14em", color: P.green, opacity: .8 }}>무너졌어요!</div>
+      <button className="btn" onClick={reset} style={{ marginTop: 12, background: P.green, color: P.cream, boxShadow: `0 4px 0 ${P.greenDeep}`, fontSize: desktop ? 16 : 14, padding: desktop ? "12px 24px" : "10px 18px" }}>다시 쌓기</button>
     </>
   ) : tower.length === 0 ? (
-    <div style={{ fontSize: 13, fontWeight: 700, color: P.green, animation: "floaty 1.6s ease-in-out infinite" }}>{desktop ? "스틱을 눌러 뽑기 →" : "← 스틱을 눌러 뽑기"}</div>
+    <div style={{ fontSize: desktop ? 16 : 13, fontWeight: 700, color: P.green, animation: "floaty 1.6s ease-in-out infinite" }}>{desktop ? "스틱을 눌러 뽑기 →" : "← 스틱을 눌러 뽑기"}</div>
   ) : (
     <>
-      <div style={{ fontFamily: F.disp, fontSize: 26, color: P.green }}>{tower.length}층</div>
-      {tower.length >= 5 && <div style={{ fontSize: 12, fontWeight: 700, color: P.red }}>위태위태…</div>}
-      <button className="btn" onClick={topple} style={{ marginTop: 8, background: "transparent", color: P.green, border: `2px solid ${P.green}`, fontSize: 12, padding: "6px 14px" }}>무너뜨리기</button>
+      <div style={{ fontFamily: F.disp, fontSize: desktop ? 34 : 26, color: P.green }}>{tower.length}층</div>
+      {tower.length >= 5 && <div style={{ marginTop: 4, fontSize: desktop ? 15 : 12, fontWeight: 700, color: P.red }}>위태위태…</div>}
+      <button className="btn" onClick={topple} style={{ marginTop: 12, background: "transparent", color: P.green, border: `2px solid ${P.green}`, fontSize: desktop ? 14 : 12, padding: desktop ? "8px 18px" : "6px 14px" }}>무너뜨리기</button>
     </>
   );
   const play = (
@@ -631,30 +686,36 @@ function PotatoScene({ onBack }) {
       ? { position: "relative", display: "grid", gridTemplateColumns: "1fr 1fr", alignItems: "end", width: 760, height: 440, padding: "0 24px", transform: `scale(${k})`, transformOrigin: "center center", flexShrink: 0 }
       : { position: "relative", display: "grid", gridTemplateColumns: "1fr 1fr", alignItems: "end", minHeight: 500, padding: "0 24px 40px", maxWidth: 900, margin: "0 auto" }}>
       <div style={{ position: "relative", height: 420, display: "flex", justifyContent: "center", alignItems: "flex-end" }}>
-        <div onClick={shake} role="button" aria-label="컵 흔들기" style={{ position: "relative", width: 200, height: 260, animation: rattle ? "rattle .12s linear 4" : "none", cursor: "pointer" }}>
-          <div style={{ position: "absolute", left: "50%", top: -70, width: 0, height: 120 }}>
+        <div onClick={shake} role="button" aria-label="컵 흔들기" style={{ position: "relative", width: CUP.w, height: CUP.h, animation: rattle ? "rattle .12s linear 4" : "none", cursor: "pointer" }}>
+          {/* 바닥 그림자 */}
+          <div style={{ position: "absolute", left: "8%", right: "8%", bottom: 4, height: 26, borderRadius: "50%", background: "radial-gradient(ellipse at 50% 50%, rgba(60,30,0,.28), rgba(60,30,0,0) 70%)" }} />
+          {/* 스틱: 컵 뒤에 세 줄로 서 있고, 각 스틱은 포인터 따라 기울어지는 3D */}
+          <div style={{ position: "absolute", left: CUP.cx, top: CUP.cy, width: 0, height: 0 }}>
             {cupSticks.map((s) => (
-              <button key={s.id} className="stickBtn" onClick={(e) => { e.stopPropagation(); pull(s.id); }} aria-label="스틱 뽑기" style={{ position: "absolute", left: s.x, top: s.lift, background: "none", border: 0, padding: 0, transform: `rotate(${s.tilt}deg)`, transformOrigin: "bottom center", animation: s.fresh ? "rise .45s cubic-bezier(.2,.9,.3,1.2)" : rattle ? "rattle .12s linear 4" : "none" }}>
-                <Stick />
-              </button>
+              <div key={s.id} style={{ position: "absolute", left: s.x, top: s.top, zIndex: s.row + 1, transform: `rotate(${s.tilt}deg)`, transformOrigin: "50% 40px" }}>
+                <button className="stickBtn" onClick={(e) => { e.stopPropagation(); pull(s.id); }} aria-label="스틱 뽑기" style={{ animation: s.fresh ? "rise .45s cubic-bezier(.2,.9,.3,1.2)" : rattle ? "rattle .12s linear 4" : "none" }}><Stick3D flip={s.flip} /></button>
+              </div>
             ))}
-            {flying && <div style={{ position: "absolute", left: flying.x, top: flying.lift, "--dx": "300px", "--dy": `${20 - tower.length * 22}px`, animation: "fly .52s cubic-bezier(.3,.8,.4,1) forwards", pointerEvents: "none" }}><Stick /></div>}
+            {flying && <div style={{ position: "absolute", left: flying.x, top: flying.top, zIndex: 9, "--dx": "300px", "--dy": `${40 - tower.length * 22}px`, animation: "fly .52s cubic-bezier(.3,.8,.4,1) forwards", pointerEvents: "none" }}><StickImg /></div>}
           </div>
-          <img src={CUP_IMG} alt="" draggable={false} style={{ position: "absolute", left: -10, bottom: 0, width: 220, maxWidth: "none", height: "auto", pointerEvents: "none" }} />
+          {/* 컵 (정면) — 스틱 아랫부분을 가린다 */}
+          <img src={CUP_REAL_IMG} alt="" draggable={false} style={{ position: "absolute", inset: 0, width: "100%", height: "100%", pointerEvents: "none", zIndex: 5 }} />
         </div>
       </div>
 
       <div style={{ position: "relative", height: 420, display: "flex", justifyContent: "center", alignItems: "flex-end" }}>
-        <div style={{ position: "absolute", bottom: 0, width: 230, height: 22, borderRadius: "50%", background: "radial-gradient(ellipse at 50% 40%, #fff, #E8E1C5)", boxShadow: "0 6px 0 #C9C1A3, 0 10px 14px rgba(60,30,0,.15)" }} />
-        <div style={{ position: "absolute", bottom: 20, display: "flex", flexDirection: "column-reverse", alignItems: "center", "--amp": amp, animation: tower.length ? `wobble ${Math.max(0.6, 1.8 - tower.length * 0.15)}s ease-in-out infinite` : "none", transformOrigin: "bottom center" }}>
+        {/* 접시 — 바닥 그림자 + 사진 */}
+        <div style={{ position: "absolute", bottom: 6, width: PLATE_W * .9, height: 30, borderRadius: "50%", background: "radial-gradient(ellipse at 50% 50%, rgba(60,30,0,.30), rgba(60,30,0,0) 70%)" }} />
+        <img src={PLATE_IMG} alt="" draggable={false} style={{ position: "absolute", bottom: 0, width: PLATE_W, height: PLATE_H, pointerEvents: "none", filter: "drop-shadow(0 4px 4px rgba(60,30,0,.18))" }} />
+        <div style={{ position: "absolute", bottom: TOWER_BOTTOM, display: "flex", flexDirection: "column-reverse", alignItems: "center", "--amp": amp, animation: tower.length ? `wobble ${Math.max(0.6, 1.8 - tower.length * 0.15)}s ease-in-out infinite` : "none", transformOrigin: "bottom center" }}>
           {tower.map((layer, i) => (
             <div key={layer.id} style={{ marginTop: 2, display: "flex", gap: 10, animation: toppled ? "fall .7s cubic-bezier(.4,0,.8,1) forwards" : "none", "--x": `${rand(-140, 140)}px`, "--r": `${rand(-120, 120)}deg`, transform: `rotate(${layer.wob}deg)` }}>
-              {i % 2 === 0 ? <Stick w={110} h={18} style={{ background: `linear-gradient(180deg, ${P.creamDeep}, ${P.cream} 35%, #FBEBB0 60%, ${P.creamDeep})` }} /> : [0, 1, 2].map((k) => <Stick key={k} w={22} h={18} />)}
+              {i % 2 === 0 ? <StickSide w={116} h={20} /> : [0, 1, 2].map((k) => <StickEnd key={k} />)}
             </div>
           ))}
         </div>
         {particles.map((p) => (
-          <div key={p.id} style={{ position: "absolute", bottom: 60, left: "50%", "--x": `${p.x}px`, "--y": `${p.y}px`, "--r": `${p.r}deg`, "--s": p.s, animation: `pop 1.1s ease-out ${p.d}s forwards`, opacity: 0, pointerEvents: "none" }}>
+          <div key={p.id} style={{ position: "absolute", bottom: TOWER_BOTTOM + 30, left: "50%", "--x": `${p.x}px`, "--y": `${p.y}px`, "--r": `${p.r}deg`, "--s": p.s, animation: `pop 1.1s ease-out ${p.d}s forwards`, opacity: 0, pointerEvents: "none" }}>
             {p.kind === "word" ? <span style={{ fontFamily: F.disp, color: P.red, fontSize: 18, textShadow: `2px 2px 0 ${P.cream}` }}>サラダ！</span> : p.kind === "fleck" ? <div style={{ width: 8, height: 8, borderRadius: 3, background: P.fleck }} /> : <div style={{ width: 12, height: 9, borderRadius: 3, background: P.cream, boxShadow: `inset 0 -2px 0 ${P.creamDeep}` }} />}
           </div>
         ))}
@@ -672,8 +733,9 @@ function PotatoScene({ onBack }) {
             <div style={{ ...PANEL_GROUP, margin: "7vh 0 auto" }}>
               {title}
               {score}
+              {/* 탑 상태 — 점수 바로 아래 (애니멀의 비스킷 격자와 같은 자리) */}
+              <div style={{ marginTop: 14 }}>{status}</div>
             </div>
-            <div style={{ marginTop: "auto", padding: "16px 18px", background: "#fff", borderRadius: 12, border: `2px dashed ${P.green}` }}>{status}</div>
           </div>
         </SidePanel>
         <section ref={areaRef} style={{ position: "relative", overflow: "hidden", display: "flex", alignItems: "center", justifyContent: "center" }}>
@@ -772,14 +834,14 @@ function MushroomScene({ onBack }) {
             <div style={{ ...PANEL_GROUP, margin: "7vh 0 auto" }}>
               {title}
               {score}
-            </div>
-            {/* 낮↔밤 표시 */}
-            <div style={{ marginTop: "auto", padding: "14px 18px", background: "#fff", borderRadius: 12, border: `2px dashed ${M.choco}` }}>
-              <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, fontWeight: 700 }}><span>☀ ひる</span><span>よる ☾</span></div>
-              <div style={{ position: "relative", height: 8, marginTop: 8, borderRadius: 99, background: `linear-gradient(90deg, ${M.sky}, ${M.dusk}, ${M.night})` }}>
-                <div style={{ position: "absolute", top: -4, left: `calc(${Math.max(0, Math.min(1, t)) * 100}% - 8px)`, width: 16, height: 16, borderRadius: "50%", background: "#fff", border: `3px solid ${M.choco}`, transition: "left .15s" }} />
+              {/* 낮↔밤 표시 — 점수 바로 아래 */}
+              <div style={{ marginTop: 14, maxWidth: 320 }}>
+                <div style={{ display: "flex", justifyContent: "space-between", fontSize: 13, fontWeight: 700 }}><span>☀ ひる</span><span>よる ☾</span></div>
+                <div style={{ position: "relative", height: 8, marginTop: 8, borderRadius: 99, background: `linear-gradient(90deg, ${M.sky}, ${M.dusk}, ${M.night})` }}>
+                  <div style={{ position: "absolute", top: -4, left: `calc(${Math.max(0, Math.min(1, t)) * 100}% - 8px)`, width: 16, height: 16, borderRadius: "50%", background: "#fff", border: `3px solid ${M.choco}`, transition: "left .15s" }} />
+                </div>
+                <div style={{ marginTop: 8, fontSize: 12, fontWeight: 700, opacity: .7 }}>오른쪽 언덕 위에서 커서를 좌우로 움직여 보세요</div>
               </div>
-              <div style={{ marginTop: 8, fontSize: 11, fontWeight: 700, opacity: .75 }}>오른쪽 언덕 위에서 커서를 좌우로 움직여 보세요</div>
             </div>
           </div>
         </SidePanel>
