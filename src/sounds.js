@@ -45,6 +45,6 @@ export function playClear() { playOnce(clearUrl, 0.7); }
 export function playTick() { playOnce(tickUrl, 0.7); }
 export function playRight() { playOnce(rightUrl, 0.7); }
 export function playWrong() { playOnce(wrongUrl, 0.6); }
-export function playDrink() { playOnce(drinkUrl, 0.35); }
+export function playDrink() { playOnce(drinkUrl, 0.3); }
 export function playRestock() { playOnce(restockUrl, 0.7); }
 export function playFridge() { playOnce(fridgeUrl, 0.6); }
