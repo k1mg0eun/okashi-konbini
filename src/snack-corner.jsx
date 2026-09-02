@@ -1171,94 +1171,76 @@ function Biscuit({ animal, revealed, size }) {
 
 // ═════════════════════════════════════════════════════════════
 // SCENE 0 · ENTRANCE (편의점 입구 — 문을 누르면 벨 + BGM과 함께 입장)
+// 실제 편의점 정면처럼: 벽돌 처마 → 초록 띠 → 흰 간판 → 파란 선 → 유리창(위)·초록 패널(아래) → 보도 타일
 // ═════════════════════════════════════════════════════════════
-function DoorPanel({ side, opened }) {
-  // side: "left" | "right" — 열리면 각자 바깥쪽으로 미끄러진다
-  return (
-    <div style={{ position: "absolute", top: 0, bottom: 0, [side]: 0, width: "50%", border: `6px solid ${FM.green}`, borderRadius: 4, background: "linear-gradient(115deg, rgba(255,255,255,.55) 0 18%, rgba(210,228,236,.35) 18% 40%, rgba(255,255,255,.25) 40% 55%, rgba(190,212,222,.35) 55%)", boxShadow: "inset 0 0 0 2px rgba(255,255,255,.5)", transition: "transform 1.1s cubic-bezier(.7,0,.3,1)", transform: opened ? `translateX(${side === "left" ? "-104%" : "104%"})` : "none", zIndex: 3, overflow: "hidden" }}>
-      {/* 세로 로고 (레퍼런스의 유리문 세로 글자) */}
-      {side === "right" && (
-        <div style={{ position: "absolute", top: 18, left: 12, writingMode: "vertical-rl", fontFamily: "'Noto Sans JP', sans-serif", fontWeight: 900, fontSize: 22, color: FM.green, letterSpacing: ".2em", textShadow: "0 1px 0 #fff" }}>おかしコンビニ</div>
-      )}
-      {/* 손잡이 바 */}
-      <div style={{ position: "absolute", top: "38%", bottom: "32%", [side === "left" ? "right" : "left"]: 10, width: 8, borderRadius: 4, background: "linear-gradient(90deg, #9AA5A1, #E8EDEB 50%, #9AA5A1)" }} />
-      {/* 유리에 붙은 포스터들 */}
-      {side === "left" && (
-        <>
-          <div style={{ position: "absolute", top: 20, left: 14, width: 58, padding: "6px 4px", background: "#FFEB3B", border: `2px solid ${A.pinkDeep}`, borderRadius: 3, transform: "rotate(-3deg)", textAlign: "center", fontFamily: "'Noto Sans JP', sans-serif", fontWeight: 900 }}>
-            <div style={{ fontSize: 9, color: A.pinkDeep }}>おかし</div>
-            <div style={{ fontSize: 14, color: "#D0021B" }}>セール</div>
-          </div>
-          <div style={{ position: "absolute", top: 96, left: 20, width: 50, padding: "5px 4px", background: "#fff", border: `2px solid ${FM.blue}`, borderRadius: 3, transform: "rotate(2deg)", textAlign: "center", fontFamily: "'Noto Sans JP', sans-serif", fontWeight: 900, fontSize: 9, color: FM.blue }}>新発売<br />🥔🍄🦁</div>
-        </>
-      )}
-    </div>
-  );
-}
+const ST = { navy: "#1F3D8C", frame: "#A9B4BA", frameDark: "#7E8A90", brick: "#B6AA98", mortar: "#D3CBBF", panel: "#00A040", glass: "rgba(190,215,228,.22)" };
+const BRICK = { background: `repeating-linear-gradient(0deg, ${ST.brick} 0 6px, ${ST.mortar} 6px 7px), repeating-linear-gradient(90deg, transparent 0 13px, ${ST.mortar}66 13px 14px)` };
 
-// 유리창 너머 매장 내부 — 천장등 + 선반 위 과자 (문이 열리면 불이 켜진다)
-function Interior({ lit, packages, pkgH = 64 }) {
-  const rows = packages ? [[CUP_IMG, ANIM_IMG, MUSH_IMG], [MUSH_IMG, CUP_IMG, ANIM_IMG]] : [];
+// 유리창 너머 매장 내부 — 흰 벽·천장 조명·빈 진열대 (과자는 보이지 않는다). 문이 열리면 밝아진다
+function Interior({ lit, shelves = 2 }) {
   return (
-    <div style={{ position: "absolute", inset: 0, background: `linear-gradient(180deg, #FFF9E8, ${FM.wall} 60%)`, filter: lit ? "brightness(1)" : "brightness(.62)", transition: "filter 1.1s" }}>
-      {/* 천장 형광등 */}
-      <div style={{ position: "absolute", top: 14, left: "8%", right: "8%", height: 8, borderRadius: 4, background: "#fff", boxShadow: lit ? "0 0 22px 8px rgba(255,255,255,.95)" : "0 1px 0 #C5CDCA", transition: "box-shadow 1.1s" }} />
-      {(packages ? [42, 72] : [28, 52, 76]).map((y, r) => (
-        <div key={y} style={{ position: "absolute", left: "8%", right: "8%", top: `${y}%`, height: 10, background: "#DDE3E0", boxShadow: "0 3px 0 #C5CDCA" }}>
-          {rows[r] && (
-            <div style={{ position: "absolute", left: 0, right: 0, bottom: 10, display: "flex", alignItems: "flex-end", justifyContent: "space-evenly" }}>
-              {rows[r].map((src, i) => <img key={i} src={src} alt="" style={{ height: pkgH + (i % 2) * Math.round(pkgH * .22), filter: "drop-shadow(0 2px 2px rgba(0,0,0,.2))" }} />)}
-            </div>
-          )}
+    <div style={{ position: "absolute", inset: 0, background: "linear-gradient(180deg, #F7F9FA 0 22%, #E9EEF0 22% 88%, #D9DFE2 88%)", filter: lit ? "brightness(1)" : "brightness(.9)", transition: "filter 1.1s", overflow: "hidden" }}>
+      {/* 천장 매입등 두 줄 */}
+      {[7, 15].map((y) => (
+        <div key={y} style={{ position: "absolute", top: `${y}%`, left: "6%", right: "6%", height: 5, borderRadius: 3, background: "#fff", boxShadow: lit ? "0 0 18px 6px rgba(255,255,255,.9)" : "0 0 8px 2px rgba(255,255,255,.5)", transition: "box-shadow 1.1s" }} />
+      ))}
+      {/* 벽과 바닥의 경계 */}
+      <div style={{ position: "absolute", left: 0, right: 0, top: "88%", height: 2, background: "#C7CFD3" }} />
+      {/* 빈 진열대 — 회색 철제, 선반 세 단 */}
+      {Array.from({ length: shelves }, (_, i) => (
+        <div key={i} style={{ position: "absolute", bottom: "12%", left: shelves === 1 ? "50%" : `${14 + i * (72 / (shelves - 1))}%`, transform: "translateX(-50%)", width: "26%", maxWidth: 220, height: "34%", maxHeight: 150, background: "repeating-linear-gradient(90deg, #C3CBCF 0 1px, transparent 1px 6px), repeating-linear-gradient(0deg, #C3CBCF 0 1px, transparent 1px 6px), #DCE2E5", border: "2px solid #AEB8BD", borderRadius: 2, boxShadow: "0 3px 0 #9FA9AE" }}>
+          {[30, 62, 94].map((t) => <div key={t} style={{ position: "absolute", left: -2, right: -2, top: `${t}%`, height: 4, background: "#B6C0C5", boxShadow: "0 2px 0 #97A2A8" }} />)}
         </div>
       ))}
     </div>
   );
 }
 
-// 데스크톱 전용 — 자동문 양옆의 큰 유리창 (포스터 + 하단 초록 띠)
-function StoreWindow({ side, lit }) {
-  const ref = useRef(null);
-  const { w } = useSize(ref);
-  const narrow = w > 0 && w < 320;           // 창이 좁으면 포스터 하나만
-  const pkgH = w ? Math.max(40, Math.min(96, Math.round(w * .19))) : 64;
-  const posterBase = { position: "absolute", fontFamily: "'Noto Sans JP', sans-serif", fontWeight: 900, textAlign: "center", borderRadius: 3, boxShadow: "0 2px 0 rgba(0,0,0,.15)" };
+// 유리 반사 — 하늘이 비친 옅은 하이라이트
+const GLASS_REFLECT = { position: "absolute", inset: 0, background: "linear-gradient(112deg, rgba(255,255,255,.34) 0 14%, rgba(205,225,236,.18) 14% 34%, rgba(255,255,255,.12) 34% 48%, rgba(180,205,220,.16) 48%)", pointerEvents: "none" };
+
+// 유리창 한 짝 — 위 2/3 유리, 아래 1/3 초록 패널(흰 줄·파란 줄)
+function StoreWindow({ lit, shelves = 2 }) {
   return (
-    <div ref={ref} style={{ position: "relative", marginTop: 14, border: "10px solid #9EAAB0", borderBottom: 0, borderRadius: "4px 4px 0 0", overflow: "hidden", background: "#B7C0BC", minWidth: 0 }}>
-      <Interior lit={lit} packages pkgH={pkgH} />
-      {/* 유리 반사 */}
-      <div style={{ position: "absolute", inset: 0, background: "linear-gradient(115deg, rgba(255,255,255,.45) 0 16%, rgba(210,228,236,.25) 16% 38%, rgba(255,255,255,.18) 38% 52%, rgba(190,212,222,.28) 52%)", pointerEvents: "none", zIndex: 2 }} />
-      {/* 창틀 세로 멀리언 */}
-      <div style={{ position: "absolute", top: 0, bottom: 0, left: "50%", width: 8, marginLeft: -4, background: "linear-gradient(90deg, #8F9A96, #E8EDEB 50%, #8F9A96)", zIndex: 3 }} />
-      {/* 하단 초록 띠 (브랜드 밴드) */}
-      <div style={{ position: "absolute", left: 0, right: 0, bottom: 0, height: "24%", background: FM.green, zIndex: 3, boxShadow: "inset 0 6px 0 #fff, inset 0 12px 0 " + FM.blue, overflow: "hidden" }}>
-        <div style={{ position: "absolute", left: 0, right: 0, top: "50%", transform: "translateY(-50%)", whiteSpace: "nowrap", color: "rgba(255,255,255,.85)", fontFamily: "'Noto Sans JP', sans-serif", fontWeight: 900, fontSize: 22, letterSpacing: ".28em", textAlign: "center", overflow: "hidden" }}>おかしコンビニ　おかしコンビニ　おかしコンビニ　おかしコンビニ</div>
+    <div style={{ position: "relative", height: "100%", border: `7px solid ${ST.frame}`, borderBottom: 0, background: ST.frameDark, overflow: "hidden", minWidth: 0 }}>
+      <div style={{ position: "absolute", left: 0, right: 0, top: 0, height: "66%", overflow: "hidden" }}>
+        <Interior lit={lit} shelves={shelves} />
+        <div style={GLASS_REFLECT} />
       </div>
-      {/* 포스터 */}
-      {side === "left" ? (
-        <>
-          <div style={{ ...posterBase, top: 48, left: narrow ? "50%" : "8%", marginLeft: narrow ? -75 : 0, width: 150, padding: "12px 10px 14px", background: A.yellow, border: `3px solid ${A.pinkDeep}`, transform: "rotate(-2.5deg)", zIndex: 4 }}>
-            <div style={{ fontSize: 13, color: A.pinkDeep, letterSpacing: ".1em" }}>おかし</div>
-            <div style={{ fontSize: 40, color: "#D0021B", lineHeight: 1 }}>セール</div>
-            <div style={{ fontSize: 11, color: A.pinkDeep, marginTop: 6 }}>ぜんぶ ¥100</div>
-          </div>
-          {!narrow && <div style={{ ...posterBase, top: 66, right: "10%", width: 104, padding: "10px 6px", background: "#fff", border: `3px solid ${FM.blue}`, transform: "rotate(2deg)", zIndex: 4, color: FM.blue }}>
-            <div style={{ fontSize: 16 }}>新発売</div>
-            <div style={{ fontSize: 22, marginTop: 4 }}>🥔🍄🦁</div>
-          </div>}
-        </>
-      ) : (
-        <>
-          <div style={{ ...posterBase, top: 50, left: narrow ? "50%" : "10%", marginLeft: narrow ? -59 : 0, width: 118, padding: "10px 8px 12px", background: "#fff", border: `3px solid ${FM.green}`, transform: "rotate(1.5deg)", zIndex: 4 }}>
-            <div style={{ fontSize: 11, color: FM.green, letterSpacing: ".12em" }}>あそびかた</div>
-            <div style={{ fontSize: 14, color: FM.ink, marginTop: 6, lineHeight: 1.4 }}>과자를 뜯으면<br />미니게임 시작!</div>
-          </div>
-          {!narrow && <div style={{ ...posterBase, top: 64, right: "9%", width: 96, padding: "8px 6px", background: FM.blue, color: "#fff", transform: "rotate(-2deg)", zIndex: 4 }}>
-            <div style={{ fontSize: 26, lineHeight: 1 }}>24H</div>
-            <div style={{ fontSize: 10, letterSpacing: ".14em", marginTop: 4 }}>年中無休</div>
-          </div>}
-        </>
+      {/* 초록 패널 */}
+      <div style={{ position: "absolute", left: 0, right: 0, bottom: 0, height: "34%", background: ST.panel, boxShadow: "inset 0 7px 0 #fff, inset 0 11px 0 " + FM.blue }} />
+      {/* 세로 멀리언 */}
+      <div style={{ position: "absolute", top: 0, bottom: 0, left: "50%", width: 7, marginLeft: -3, background: ST.frame }} />
+    </div>
+  );
+}
+
+// 자동문 한 짝 — 초록 테두리 유리문. 열리면 각자 바깥쪽으로 미끄러진다
+function DoorPanel({ side, opened, vertical, sticker }) {
+  return (
+    <div style={{ position: "absolute", top: 0, bottom: 0, [side]: 0, width: "50%", border: `8px solid ${ST.panel}`, boxShadow: "inset 0 0 0 2px #0B7A33", background: ST.glass, transform: opened ? `translateX(${side === "left" ? "-100%" : "100%"})` : "none", transition: "transform 1.5s cubic-bezier(.65,0,.35,1)", overflow: "hidden" }}>
+      <div style={GLASS_REFLECT} />
+      {/* 세로 로고 — 오른쪽 문 유리에 초록 글자 */}
+      {vertical && side === "right" && (
+        <div style={{ position: "absolute", top: "7%", left: 16, writingMode: "vertical-rl", fontFamily: "'Noto Sans JP', sans-serif", fontWeight: 900, fontSize: "clamp(26px, 2.5vw, 38px)", color: FM.green, letterSpacing: ".16em", textShadow: "0 1px 0 rgba(255,255,255,.8)" }}>おかしコンビニ</div>
       )}
+      {/* 「営業中」 팻말 — 왼쪽 문 유리에 흡착 고리로 매달려 살짝 흔들린다 */}
+      {sticker && side === "left" && (
+        <div style={{ position: "absolute", left: "50%", top: "10%", width: 0, height: 0, zIndex: 2 }}>
+          <div style={{ position: "absolute", left: -7, top: -7, width: 14, height: 14, borderRadius: "50%", background: "radial-gradient(circle at 40% 35%, #F4F7F6, #9AA5A1)", boxShadow: "0 1px 2px rgba(0,0,0,.35)" }} />
+          <div style={{ position: "absolute", left: 0, top: 0, transformOrigin: "0 0", animation: opened ? "none" : "swing 3.2s ease-in-out infinite" }}>
+            {/* 끈 */}
+            <div style={{ position: "absolute", left: -1, top: 4, width: 2, height: 30, background: "#8A7A5A" }} />
+            {/* 팻말 */}
+            <div style={{ position: "absolute", top: 32, left: "50%", transform: "translateX(-50%)", width: "max(96px, min(150px, 9vw))", background: "#FFFDF6", border: "3px solid #2B2B2B", borderRadius: 6, padding: "9px 8px 8px", textAlign: "center", fontFamily: "'Noto Sans JP', sans-serif", boxShadow: "0 3px 6px rgba(0,0,0,.25)" }}>
+              <div style={{ fontWeight: 900, fontSize: "clamp(20px, 2vw, 30px)", lineHeight: 1, color: "#D0021B", letterSpacing: ".04em", whiteSpace: "nowrap" }}>営業中</div>
+              <div style={{ marginTop: 6, paddingTop: 5, borderTop: "2px solid #2B2B2B", fontWeight: 900, fontSize: "clamp(10px, .95vw, 13px)", color: FM.blue, letterSpacing: ".18em", whiteSpace: "nowrap" }}>24時間</div>
+            </div>
+          </div>
+        </div>
+      )}
+      {/* 긴 손잡이 */}
+      <div style={{ position: "absolute", top: "36%", bottom: "38%", [side === "left" ? "right" : "left"]: 12, width: 9, borderRadius: 5, background: "linear-gradient(90deg, #8F9A96, #F2F5F4 45%, #8F9A96)", boxShadow: "0 1px 3px rgba(0,0,0,.35)" }} />
     </div>
   );
 }
@@ -1272,72 +1254,55 @@ function Entrance({ onEnter }) {
     playChimeThenBgm();
     setTimeout(onEnter, 1200); // 문이 거의 열렸을 때 선반으로 전환
   }
-  const signage = (
-    <div style={{ background: "#fff", padding: "16px 0 0", textAlign: "center", boxShadow: "0 4px 10px rgba(0,0,0,.12)", position: "relative", zIndex: 2, flexShrink: 0 }}>
-      <div style={{ display: "inline-flex", alignItems: "center", gap: 12 }}>
+
+  // 처마·간판: 벽돌 → 초록 띠 → 흰 간판(로고) → 파란 선 → 벽돌
+  const fascia = (
+    <div style={{ flexShrink: 0, position: "relative", zIndex: 2, boxShadow: "0 6px 14px rgba(0,0,0,.18)" }}>
+      <div style={{ height: desktop ? 16 : 10, ...BRICK }} />
+      <div style={{ height: desktop ? 34 : 18, background: FM.green }} />
+      <div style={{ height: desktop ? 112 : 64, background: "#fff", display: "flex", alignItems: "center", justifyContent: "center", gap: desktop ? 16 : 9 }}>
         <div style={{ display: "flex", flexDirection: "column", gap: 3 }}>
-          <div style={{ width: 34, height: 15, background: FM.green, borderRadius: 2 }} />
-          <div style={{ width: 34, height: 15, background: FM.blue, borderRadius: 2 }} />
+          <div style={{ width: desktop ? 60 : 34, height: desktop ? 24 : 13, background: FM.green, borderRadius: 3 }} />
+          <div style={{ width: desktop ? 60 : 34, height: desktop ? 24 : 13, background: FM.blue, borderRadius: 3 }} />
         </div>
-        <div style={{ fontFamily: "'Noto Sans JP', sans-serif", fontWeight: 900, fontSize: "clamp(26px, 6vw, 44px)", color: FM.blue, letterSpacing: "-.01em" }}>おかしコンビニ</div>
+        <div style={{ fontFamily: "'Noto Sans JP', sans-serif", fontWeight: 900, fontSize: desktop ? "clamp(40px, 4.6vw, 66px)" : "clamp(24px, 8vw, 36px)", color: ST.navy, letterSpacing: "-.01em", lineHeight: 1 }}>おかしコンビニ</div>
       </div>
-      <div style={{ marginTop: 12, height: 7, background: FM.green }} />
-      <div style={{ height: 7, background: "#fff" }} />
-      <div style={{ height: 7, background: FM.blue }} />
+      <div style={{ height: desktop ? 8 : 5, background: FM.blue }} />
+      <div style={{ height: desktop ? 12 : 8, ...BRICK }} />
     </div>
   );
+
+  // 자동문 구역 — 위쪽 유리 트랜섬 + 두 짝의 문. 문 뒤로 매장 내부가 보인다
   const door = (
-    <div onClick={enter} role="button" data-silent aria-label="편의점 입장" style={{ position: "absolute", inset: desktop ? "14px 0 0" : "0 4vw 7vh", cursor: opened ? "default" : "pointer" }}>
-      {/* 문 뒤로 보이는 매장 내부 (열리면 밝아짐) */}
-      <Interior lit={opened} />
-      <DoorPanel side="left" opened={opened} />
-      <DoorPanel side="right" opened={opened} />
-      {/* 입장 안내 */}
-      {!opened && (
-        <div style={{ position: "absolute", left: "50%", top: "58%", transform: "translateX(-50%)", zIndex: 4, background: FM.ink, color: "#fff", borderRadius: 99, padding: "12px 22px", fontWeight: 700, fontSize: 15, whiteSpace: "nowrap", boxShadow: "0 4px 14px rgba(0,0,0,.3)", animation: "floaty 1.6s ease-in-out infinite" }}>🔔 문을 눌러 입장하기</div>
-      )}
-      {/* 営業中 표지판 */}
-      <div style={{ position: "absolute", left: "50%", top: 14, transform: "translateX(-50%)", zIndex: 4, width: 74, background: "#fff", border: `2px solid ${FM.ink}`, borderRadius: 6, padding: "7px 0 6px", textAlign: "center", boxShadow: "0 2px 0 rgba(0,0,0,.2)", fontFamily: "'Noto Sans JP', sans-serif", opacity: opened ? 0 : 1, transition: "opacity .5s" }}>
-        <div style={{ fontWeight: 900, fontSize: 15, color: FM.green, lineHeight: 1 }}>営業中</div>
-        <div style={{ fontWeight: 900, fontSize: 9, color: FM.blue, letterSpacing: ".08em", marginTop: 3 }}>24時間</div>
+    <div onClick={enter} role="button" data-silent aria-label="편의점 입장" style={{ position: "relative", height: "100%", border: `7px solid ${ST.frame}`, borderBottom: 0, background: ST.frameDark, overflow: "hidden", cursor: opened ? "default" : "pointer" }}>
+      <Interior lit={opened} shelves={0} />
+      {/* 트랜섬(문 위 고정 유리) */}
+      <div style={{ position: "absolute", left: 0, right: 0, top: 0, height: "17%", borderBottom: `7px solid ${ST.frame}`, overflow: "hidden" }}><div style={GLASS_REFLECT} /></div>
+      {/* 문 두 짝 */}
+      <div style={{ position: "absolute", left: 0, right: 0, top: "17%", bottom: 0, overflow: "hidden" }}>
+        <DoorPanel side="left" opened={opened} sticker />
+        <DoorPanel side="right" opened={opened} vertical />
       </div>
     </div>
   );
-  const tileWall = (h) => (
-    <div style={{ flex: `0 0 ${h}`, background: "repeating-linear-gradient(0deg, #D9CFC0 0 26px, #C7BCAB 26px 29px), repeating-linear-gradient(90deg, transparent 0 54px, #C7BCAB55 54px 57px)" }} />
+
+  // 보도 — 킥플레이트 + 밝은 회색 타일
+  const sidewalk = (h) => (
+    <div style={{ position: "relative", zIndex: 3, height: h, flexShrink: 0, background: "#DDE3E0", backgroundImage: "linear-gradient(180deg, #8F9A96 0 9px, #C9D1CE 9px 12px, transparent 12px), linear-gradient(90deg, rgba(0,0,0,.07) 1px, transparent 1px), linear-gradient(180deg, rgba(0,0,0,.07) 1px, transparent 1px)", backgroundSize: "100% 100%, 64px 64px, 64px 64px", boxShadow: "inset 0 12px 16px -10px rgba(0,0,0,.28)" }} />
   );
 
-  if (!desktop) {
-    return (
-      <div className="scene" style={{ minHeight: "100vh", background: "#CFD6D3", position: "relative", overflow: "hidden", display: "flex", flexDirection: "column" }}>
-        {tileWall("12vh")}
-        {signage}
-        {/* 유리문 구역 */}
-        <div style={{ flex: 1, position: "relative", background: "#B7C0BC", padding: "0 4vw" }}>
-          {door}
-          {/* 바닥 */}
-          <div style={{ position: "absolute", left: 0, right: 0, bottom: 0, height: "7vh", background: "linear-gradient(180deg, #8F9A96, #6F7A76)" }} />
-        </div>
-      </div>
-    );
-  }
-
-  // ── 데스크톱: [유리창 | 자동문 | 유리창] 파사드 + 보도 타일 ──
   return (
-    <div className="scene" style={{ height: "100vh", background: "#CFD6D3", position: "relative", overflow: "hidden", display: "flex", flexDirection: "column" }}>
-      {tileWall("9vh")}
-      {signage}
-      <div style={{ flex: 1, minHeight: 0, position: "relative", background: "#B7C0BC", padding: "0 2.5vw", display: "grid", gridTemplateColumns: "1fr clamp(520px, 42vw, 720px) 1fr", columnGap: 14 }}>
-        {/* 타일 기둥 (양 끝) */}
-        {["left", "right"].map((s) => (
-          <div key={s} style={{ position: "absolute", top: 0, bottom: 0, [s]: 0, width: "2.5vw", background: "repeating-linear-gradient(0deg, #D9CFC0 0 26px, #C7BCAB 26px 29px)", boxShadow: s === "left" ? "inset -4px 0 8px rgba(0,0,0,.12)" : "inset 4px 0 8px rgba(0,0,0,.12)" }} />
-        ))}
-        <StoreWindow side="left" lit={opened} />
-        <div style={{ position: "relative" }}>{door}</div>
-        <StoreWindow side="right" lit={opened} />
+    <div className="scene" style={{ height: "100vh", background: "linear-gradient(180deg, #CFE4F5, #EAF3FA)", position: "relative", overflow: "hidden", display: "flex", flexDirection: "column" }}>
+      {/* 하늘 */}
+      <div style={{ flex: `0 0 ${desktop ? "9vh" : "6vh"}` }} />
+      {fascia}
+      {/* 정면: [유리창 | 자동문 | 유리창] — 모바일은 양옆 창이 좁게만 보인다 */}
+      <div style={{ flex: 1, minHeight: 0, position: "relative", background: "#B4BEC3", padding: 0, display: "grid", gridTemplateColumns: desktop ? "1fr clamp(380px, 30vw, 540px) 1fr" : "12% 1fr 12%", columnGap: desktop ? 10 : 6, alignItems: "stretch" }}>
+        <StoreWindow lit={opened} shelves={0} />
+        {door}
+        <StoreWindow lit={opened} shelves={0} />
       </div>
-      {/* 보도: 킥플레이트 + 타일 */}
-      <div style={{ position: "relative", zIndex: 3, height: 72, flexShrink: 0, background: "linear-gradient(180deg, #8F9A96 0 10px, #DDE3E0 10px)", backgroundImage: "linear-gradient(180deg, #8F9A96 0 10px, transparent 10px), linear-gradient(90deg, rgba(0,0,0,.06) 1px, transparent 1px), linear-gradient(180deg, rgba(0,0,0,.06) 1px, transparent 1px)", backgroundSize: "100% 100%, 56px 56px, 56px 56px", boxShadow: "inset 0 10px 14px -8px rgba(0,0,0,.25)" }} />
+      {sidewalk(desktop ? "13vh" : "8vh")}
     </div>
   );
 }
