@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useMemo } from "react";
-import { playChimeThenBgm, playCrunch } from "./sounds.js";
+import { playChimeThenBgm, playCrunch, playStickGrab, playStickPlace, playStickTopple, playClear, playTick, playRight, playWrong, playDrink, playRestock, playFridge } from "./sounds.js";
 import CUP_IMG from "./assets/cup.png";
 import CUP_OPEN_IMG from "./assets/cup-open.png";
 import CUP_REAL_IMG from "./assets/cup-real.png"; // 실제 컵 사진 (살짝 위에서, 배경 투명)
@@ -46,7 +46,8 @@ const GLOBAL_CSS = `
   @keyframes wobble { 0%,100% { transform: rotate(calc(var(--amp) * -1deg)) } 50% { transform: rotate(calc(var(--amp) * 1deg)) } }
   @keyframes rattle { 0%,100% { transform: translateX(0) rotate(0) } 25% { transform: translateX(-4px) rotate(-2deg) } 75% { transform: translateX(4px) rotate(2deg) } }
   @keyframes pop { 0% { opacity:1; transform: translate(0,0) rotate(0) scale(var(--s)) } 100% { opacity:0; transform: translate(var(--x), var(--y)) rotate(var(--r)) scale(var(--s)) } }
-  @keyframes fall { to { transform: translate(var(--x), 140px) rotate(var(--r)); opacity: .9 } }
+  @keyframes tumble { to { transform: translate(var(--x), var(--y)) rotate(var(--r)); opacity: .92 } }
+  @keyframes placePop { 0% { transform: translateY(-9px) scaleY(.6) } 60% { transform: translateY(0) scaleY(1.12) } 100% { transform: translateY(0) scaleY(1) } }
   @keyframes floaty { 0%,100% { transform: translateY(0) } 50% { transform: translateY(-6px) } }
   @keyframes sprout { 0% { transform: scaleY(0) } 70% { transform: scaleY(1.1) } 100% { transform: scaleY(1) } }
   @keyframes capDrop { 0% { transform: translate(0,0) rotate(0) } 100% { transform: translate(var(--x), 160px) rotate(var(--r)); opacity: 0 } }
@@ -81,7 +82,8 @@ const GLOBAL_CSS = `
   .tierScroll { scrollbar-width: none; -webkit-overflow-scrolling: touch; cursor: grab; }
   .tierScroll:active { cursor: grabbing; }
   .tierScroll::-webkit-scrollbar { display: none; }
-  .stickBtn { cursor: grab; transition: transform .18s; display: block; background: none; border: 0; padding: 0; }
+  .stickBtn { cursor: grab; transition: transform .18s; display: block; background: none; border: 0; padding: 0; touch-action: none; }
+  .stickBtn:active { cursor: grabbing; }
   .stickBtn:hover, .stickBtn:focus-visible { transform: translateY(-22px); outline: none; }
   .stickImg { display: block; pointer-events: none; user-select: none; -webkit-user-drag: none; filter: drop-shadow(0 3px 3px rgba(60,30,0,.25)); }
   .shroom { cursor: pointer; transform-origin: bottom center; transition: transform .2s; }
@@ -276,6 +278,7 @@ function DrinkFridge() {
   const pick = (key) => (e) => {
     e.stopPropagation();
     if (!anyOpen || picked[key]) return;
+    playDrink();
     setPicked((m) => ({ ...m, [key]: "picking" }));
     setTimeout(() => setPicked((m) => ({ ...m, [key]: "taken" })), 280);
   };
@@ -292,6 +295,7 @@ function DrinkFridge() {
       timers.push(setTimeout(() => {
         setPicked((m) => Object.fromEntries(Object.entries(m).filter(([k]) => !k.startsWith(`${i}-`))));
         setRestock((r) => ({ ...r, [i]: (r[i] || 0) + 1 }));
+        playRestock();
       }, 1200));
     });
     return () => timers.forEach(clearTimeout);
@@ -333,7 +337,7 @@ function DrinkFridge() {
   const door = (() => {
     const isOpen = open;
     return (
-      <div className="fridgeDoor" role="button" aria-label={isOpen ? "냉장고 문 닫기" : "냉장고 문 열기"} onClick={() => setOpen((o) => !o)}
+      <div className="fridgeDoor" role="button" data-silent aria-label={isOpen ? "냉장고 문 닫기" : "냉장고 문 열기"} onClick={() => { playFridge(); setOpen((o) => !o); }}
         style={{ transform: isOpen ? "translateX(86%)" : "none", zIndex: 5 }}>
         {/* 유리 + 프레임 */}
         <div style={{ position: "absolute", inset: 0, border: "7px solid #C0C9CE", borderColor: "#D9E0E3 #A3AEB4 #A3AEB4 #D9E0E3", background: isOpen ? "linear-gradient(115deg, rgba(255,255,255,.14) 0 18%, rgba(220,235,242,.08) 18% 42%, rgba(255,255,255,.06) 42% 55%, rgba(200,222,232,.1) 55%)" : "linear-gradient(115deg, rgba(255,255,255,.28) 0 18%, rgba(220,235,242,.16) 18% 42%, rgba(255,255,255,.12) 42% 55%, rgba(200,222,232,.18) 55%)", boxShadow: isOpen ? "-10px 0 24px rgba(0,0,0,.22), inset 0 0 0 2px rgba(255,255,255,.6)" : "inset 0 0 0 2px rgba(255,255,255,.6)" }}>
@@ -356,7 +360,7 @@ function DrinkFridge() {
       </div>
       {/* 본체: 내부 + 유리문 */}
       <div style={{ position: "relative", flex: 1, minHeight: 0, margin: "0 8px", overflow: "hidden" }}>
-        <div ref={innerRef} onClick={() => anyOpen && setOpen(false)} style={{ position: "absolute", inset: 0, background: "linear-gradient(180deg, #F3FAFF, #DCEBF4)", boxShadow: "inset 0 0 40px rgba(120,170,200,.35)", display: "flex", flexDirection: "column", overflow: "hidden", cursor: anyOpen ? "pointer" : "default" }}>
+        <div ref={innerRef} onClick={() => { if (anyOpen) { playFridge(); setOpen(false); } }} style={{ position: "absolute", inset: 0, background: "linear-gradient(180deg, #F3FAFF, #DCEBF4)", boxShadow: "inset 0 0 40px rgba(120,170,200,.35)", display: "flex", flexDirection: "column", overflow: "hidden", cursor: anyOpen ? "pointer" : "default" }}>
           {/* 내부 LED 천장 */}
           <div style={{ position: "absolute", left: 0, right: 0, top: 0, height: 6, background: "#fff", boxShadow: "0 0 24px 10px rgba(255,255,255,.95)", zIndex: 2 }} />
           {rows}
@@ -519,7 +523,7 @@ function RealPackage({ item, h, active, onClick, scale = 1 }) {
   const w = PKG_W[item.kind] * scale;
   const opened = active && OPEN_IMG[item.key];
   return (
-    <button className="boxBtn" onClick={onClick} aria-label="상자 열기" style={{ width: w, height: h, flexShrink: 0, position: "relative", animation: active && !opened ? "zoomIn .65s ease-in forwards" : "none", zIndex: active ? 4 : 1 }}>
+    <button className="boxBtn" data-silent onClick={onClick} aria-label="상자 열기" style={{ width: w, height: h, flexShrink: 0, position: "relative", animation: active && !opened ? "zoomIn .65s ease-in forwards" : "none", zIndex: active ? 4 : 1 }}>
       {opened && (
         <img src={OPEN_IMG[item.key]} alt="" draggable={false} style={{ position: "absolute", left: OPEN_FIT[item.key]?.left ? 0 : "50%", bottom: 0, transform: OPEN_FIT[item.key]?.left ? "none" : "translateX(-50%)", transformOrigin: "bottom left", width: w * (OPEN_FIT[item.key]?.scale || 1), height: "auto", maxWidth: "none", animation: `${OPEN_FIT[item.key]?.left ? "openPopL" : "openPop"} .35s cubic-bezier(.2,.9,.3,1.3) both`, filter: "drop-shadow(0 8px 12px rgba(0,0,0,.25))" }} />
       )}
@@ -550,7 +554,7 @@ const PANEL_GROUP = { margin: "auto 0", display: "flex", flexDirection: "column"
 function useDesktop() { return useMedia("(min-width: 900px)"); }
 
 // ═════════════════════════════════════════════════════════════
-// SCENE 2 · POTATO STICK CUP
+// SCENE 2 · POTATO STICK CUP — 드래그해서 쌓는 탑
 // ═════════════════════════════════════════════════════════════
 const P = { green: "#1E8A4C", greenDeep: "#0F3D25", greenLite: "#5FC27C", cream: "#F3DC8F", creamDeep: "#D9B85A", butter: "#FFF3BF", fleck: "#3E9A3A", red: "#E2503C" };
 
@@ -573,7 +577,29 @@ function mkStick(id, row, i) {
   return { id, row, i, x: -CUP.rx * 0.74 + (r.n === 1 ? span / 2 : i * span / (r.n - 1)) + rand(-5, 5) - STICK_W / 2, top: r.base - rand(46, 80), tilt: rand(-4, 4) + (i - (r.n - 1) / 2) * 2.2, flip: Math.random() < .5 };
 }
 
-// 스틱 사진 — 세로(컵 안·탑 가로층은 회전)와 단면(탑 교차층) 두 가지로 쓴다
+// ── 탑 기하 ───────────────────────────────────────────────────
+// 한 층 = 눕힌 스틱 1개
+const LAYER_W = 116, LAYER_H = 20, LAYER_STEP = 20;
+const MAX_LAYERS = 20;                // 여기까지 쌓으면 완성
+const PLAY_H = 520;                   // 플레이 영역 높이 — 접시 위 20층(61 + 400)이 들어온다
+const SUPPORT = LAYER_W / 2 * 0.95;   // 아래 층이 위쪽 무게를 받아줄 수 있는 반폭
+const PLATE_SUPPORT = PLATE_W * 0.32; // 접시 안쪽 평면의 반폭 — 여기를 벗어나게는 놓지 못한다
+const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+
+// 젠가 물리의 단순 버전 — 각 접촉면에서 그 위 층들의 무게중심이 지지 폭 안에 있어야 한다
+function stability(layers) {
+  let risk = 0, dir = 1;
+  for (let i = 0; i < layers.length; i++) {
+    const above = layers.slice(i);
+    const com = above.reduce((s, l) => s + l.x, 0) / above.length;
+    const cx = layers[Math.max(0, i - 1)].x; // i층이 딛고 선 면의 중심 (0층은 접시에 닿은 자기 밑면)
+    const r = Math.abs(com - cx) / SUPPORT;
+    if (r > risk) { risk = r; dir = Math.sign(com - cx) || 1; }
+  }
+  return { ok: risk <= 1, risk, dir };
+}
+
+// 스틱 사진 — 세로(컵 안)와 눕힌 것(탑) 두 가지로 쓴다
 function StickImg({ h = STICK_H, style }) {
   return <img className="stickImg" src={STICK_IMG} alt="" draggable={false} style={{ height: h, width: Math.round(h * 140 / 800), ...style }} />;
 }
@@ -607,84 +633,144 @@ function Stick3D({ h = STICK_H, flip }) {
     </div>
   );
 }
-function StickEnd({ w = 24, h = 20 }) { // 앞을 보고 있는 스틱 토막 (단면)
-  return <img className="stickImg" src={STICK_IMG} alt="" draggable={false} style={{ width: w, height: h, objectFit: "cover", objectPosition: "50% 40%", borderRadius: "45%", boxShadow: "inset 0 0 0 2px rgba(120,80,0,.25)" }} />;
-}
+// 탑의 한 층
+function Layer() { return <StickSide w={LAYER_W} h={LAYER_H} />; }
 
 function PotatoScene({ onBack }) {
   const mk = () => CUP_ROWS.flatMap((r, row) => Array.from({ length: r.n }, (_, i) => mkStick(row * 10 + i, row, i)));
   const [cupSticks, setCupSticks] = useState(mk);
-  const [tower, setTower] = useState(() => { const n = +new URLSearchParams(window.location.search).get("tower") || 0; return Array.from({ length: n }, (_, i) => ({ id: -1 - i, wob: rand(-3, 3) })); }); // ?tower=5 로 쌓인 상태 확인 (개발용)
-  const [flying, setFlying] = useState(null);
+  const [tower, setTower] = useState(() => { const n = Math.min(MAX_LAYERS, +new URLSearchParams(window.location.search).get("tower") || 0); return Array.from({ length: n }, (_, i) => ({ id: -1 - i, x: rand(-14, 14), wob: rand(-1.6, 1.6) })); }); // ?tower=5 로 쌓인 상태 확인 (개발용)
+  const [held, setHeld] = useState(null); // 손에 들고 있는 스틱 { id, px, py, x, over }
   const [toppled, setToppled] = useState(false);
   const [rattle, setRattle] = useState(false);
   const [particles, setParticles] = useState([]);
-  const [count, setCount] = useState(0);
+  const [flash, setFlash] = useState(0); // 방금 놓인 층 번호 (통통 튀는 연출)
   const idRef = useRef(100);
-
-  function pull(id) {
-    if (flying || toppled) return;
-    playCrunch();
-    const s = cupSticks.find((c) => c.id === id);
-    setFlying(s);
-    setCupSticks((p) => p.filter((c) => c.id !== id));
-    setTimeout(() => {
-      setTower((t) => [...t, { id: s.id, wob: rand(-3, 3) }]);
-      setCount((n) => n + 1);
-      setFlying(null);
-      setCupSticks((p) => [...p, { ...mkStick(idRef.current++, s.row, s.i), fresh: true }]);
-    }, 520);
-  }
-  useEffect(() => {
-    if (toppled || tower.length === 0) return;
-    if (tower.length >= 7 && Math.random() < (tower.length - 6) * 0.22) topple();
-  }, [tower.length]);
-  function topple() {
-    setToppled(true);
-    setParticles(Array.from({ length: 26 }, (_, i) => ({ id: i, x: rand(-160, 160), y: rand(-220, -40), r: rand(0, 360), s: rand(0.5, 1.2), d: rand(0, 0.25), kind: i % 5 === 0 ? "word" : i % 2 ? "fleck" : "crumb" })));
-  }
-  function reset() { setTower([]); setToppled(false); setParticles([]); }
-  function shake() { setRattle(true); setTimeout(() => setRattle(false), 500); }
-  const amp = toppled ? 0 : Math.min(tower.length, 6) * 0.9;
 
   const desktop = useDesktop();
   const areaRef = useRef(null);
+  const anchorRef = useRef(null); // 탑 밑바닥 기준점 (접시 안쪽 중심)
   const { w: aw, h: ah } = useSize(areaRef);
-  const k = desktop && aw && ah ? Math.max(1, Math.min(1.7, (aw - 48) / 760, (ah - 48) / 470)) : 1; // 플레이 영역을 화면에 맞춰 확대
+  const PLAY_W = desktop ? 760 : 620; // 모바일은 컵·접시 사이 여백을 줄여 더 크게 보이게 한다
+  const k = !aw ? 1 : desktop
+    ? clamp(Math.min((aw - 48) / 760, (ah - 48) / (PLAY_H + 30)), 1, 1.7) // 데스크톱: 남는 공간만큼 확대
+    : clamp(Math.min((aw - 12) / PLAY_W, (ah - 12) / PLAY_H), 0.5, 1.15); // 모바일: 화면 폭·남은 높이에 맞춰 축소
+
+  // 포인터 핸들러가 최신 값을 보도록 거울 ref를 둔다 (드래그 중 리스너를 다시 붙이지 않기 위해)
+  const heldRef = useRef(null), towerRef = useRef(tower), kRef = useRef(k), topRef = useRef(false);
+  towerRef.current = tower; kRef.current = k; topRef.current = toppled;
+  const setHold = (v) => { heldRef.current = typeof v === "function" ? v(heldRef.current) : v; setHeld(heldRef.current); };
+
+  // 화면 좌표 → 탑 기준 좌표 (플레이 영역이 scale(k) 되어 있으므로 되돌린다)
+  function project(cx, cy) {
+    const el = anchorRef.current;
+    if (!el) return { x: 0, y: 0, over: false };
+    const r = el.getBoundingClientRect();
+    const x = (cx - r.left) / kRef.current, y = (r.top - cy) / kRef.current;
+    return { x, y, over: Math.abs(x) < 200 && y > -70 && y < 520 };
+  }
+
+  // 컵에서 스틱을 잡는다 — 뽑혀 날아가는 대신 그대로 손에 들린다
+  function grab(e, s) {
+    if (heldRef.current || toppled || towerRef.current.length >= MAX_LAYERS) return;
+    e.preventDefault(); e.stopPropagation();
+    try { e.currentTarget.setPointerCapture(e.pointerId); } catch { }
+    playStickGrab();
+    setHold({ id: s.id, px: e.clientX, py: e.clientY, ...project(e.clientX, e.clientY) });
+  }
+  // 손을 뗀 자리를 그 층의 위치로 삼는다. 컵에는 새 스틱이 솟아오른다
+  function release(place) {
+    const h = heldRef.current; if (!h) return;
+    const t = towerRef.current;
+    if (place && h.over && !topRef.current && t.length < MAX_LAYERS) {
+      const x = clamp(h.x, -PLATE_SUPPORT, PLATE_SUPPORT);
+      const next = [...t, { id: idRef.current++, x, wob: rand(-1.6, 1.6) }];
+      setTower(next);
+      playStickPlace();
+      setFlash(next.length); setTimeout(() => setFlash(0), 400);
+      const st = stability(next);
+      if (!st.ok) setTimeout(() => topple(st.dir), 300);
+      else if (next.length >= MAX_LAYERS) setTimeout(playClear, 350); // 20층 완성 — 놓는 소리 뒤에 축하 멜로디
+    }
+    setCupSticks((p) => p.map((c) => (c.id === h.id ? { ...mkStick(idRef.current++, c.row, c.i), fresh: true } : c)));
+    setHold(null);
+  }
+
+  const dragging = !!held;
+  useEffect(() => {
+    if (!dragging) return;
+    const move = (e) => setHold((h) => h && { ...h, px: e.clientX, py: e.clientY, ...project(e.clientX, e.clientY) });
+    const up = () => release(true);
+    const cancel = () => release(false);
+    window.addEventListener("pointermove", move);
+    window.addEventListener("pointerup", up);
+    window.addEventListener("pointercancel", cancel);
+    return () => { window.removeEventListener("pointermove", move); window.removeEventListener("pointerup", up); window.removeEventListener("pointercancel", cancel); };
+  }, [dragging]);
+
+  function topple(dir = 1) {
+    setToppled(true);
+    playStickTopple();
+    setTower((t) => t.map((l, i) => {
+      const to = clamp(l.x * 0.3 + dir * (12 + i * 9) + rand(-22, 22), -PLATE_SUPPORT - 26, PLATE_SUPPORT + 26);
+      return { ...l, fx: to - l.x, fy: i * LAYER_STEP - rand(0, 6), fr: dir * (25 + i * 16) + rand(-18, 18) };
+    }));
+    setParticles(Array.from({ length: 26 }, (_, i) => ({ id: i, x: rand(-160, 160), y: rand(-220, -40), r: rand(0, 360), s: rand(0.5, 1.2), d: rand(0, 0.25), kind: i % 5 === 0 ? "word" : i % 2 ? "fleck" : "crumb" })));
+  }
+  function reset() { setTower([]); setToppled(false); setParticles([]); }
+  function shake() { if (heldRef.current) return; setRattle(true); setTimeout(() => setRattle(false), 500); }
+
+  // 안정도 — 지금 탑이 얼마나 위태로운지. 놓기 전 미리보기도 같은 규칙으로 판정한다
+  const st = useMemo(() => stability(tower), [tower]);
+  const topX = tower.length ? tower[tower.length - 1].x : 0;
+  const snapX = held ? clamp(held.x, -PLATE_SUPPORT, PLATE_SUPPORT) : 0;
+  const aiming = !!held && held.over && !toppled;
+  const preview = useMemo(() => (aiming ? stability([...tower, { x: snapX }]) : null), [aiming, snapX, tower]);
+  const okNow = !preview || preview.ok;
+  const lean = toppled ? 0 : st.dir * Math.max(0, st.risk - 0.35) / 0.65 * 7; // 위태로울수록 그쪽으로 기운다
+  const amp = toppled ? 0 : Math.min(6, tower.length * 0.4 + st.risk * 3);
+  const shaky = !toppled && st.risk > 0.72;
+  const done = !toppled && tower.length >= MAX_LAYERS; // 20층 완성 — 더는 쌓지 못한다
+  const left = MAX_LAYERS - tower.length;
+  const guideW = tower.length ? SUPPORT : PLATE_SUPPORT;
 
   const pattern = <div style={{ position: "absolute", inset: 0, backgroundImage: `linear-gradient(45deg, ${P.greenLite}22 25%, transparent 25%, transparent 75%, ${P.greenLite}22 75%), linear-gradient(45deg, ${P.greenLite}22 25%, transparent 25%, transparent 75%, ${P.greenLite}22 75%)`, backgroundSize: "40px 40px", backgroundPosition: "0 0, 20px 20px", opacity: 0.6, pointerEvents: "none" }} />;
   const title = (
     <div>
       <h1 style={{ fontFamily: F.disp, fontSize: desktop ? "clamp(40px, 3.6vw, 56px)" : "clamp(34px, 7vw, 64px)", lineHeight: 1.05, margin: 0, color: P.green, textShadow: `3px 3px 0 ${P.cream}` }}>ポテト<br />スティック</h1>
       <div style={{ marginTop: desktop ? 16 : 8, fontSize: 13, fontWeight: 700, letterSpacing: ".18em", color: P.green, opacity: .8 }}>감자 스틱 탑 쌓기</div>
-      <p style={{ margin: desktop ? "34px 0 0" : "10px 0 0", maxWidth: 320, fontSize: desktop ? 17 : 14, lineHeight: desktop ? 1.85 : 1.6, fontWeight: 700, wordBreak: "keep-all" }}>컵에서 스틱을 뽑아 탑을 쌓아 보세요!<br />높이 쌓을수록 탑이 흔들려요. 컵을 톡 치면 스틱이 들썩입니다.</p>
+      <p style={{ margin: desktop ? "34px 0 0" : "10px 0 0", maxWidth: 320, fontSize: desktop ? 17 : 14, lineHeight: desktop ? 1.85 : 1.6, fontWeight: 700, wordBreak: "keep-all" }}>{desktop ? <>컵에서 과자를 드래그해 접시 위에 놓으세요.<br />놓은 자리 그대로 층이 쌓여요.<br />균형이 안 맞으면 와르르 무너지니 조심!</> : <>스틱을 잡아 접시 위로 끌어다 놓으세요.<br />무게중심이 아래 층을 벗어나면 무너져요.</>}</p>
     </div>
   );
-  const score = (
+  const scoreBox = (
     <div style={{ textAlign: desktop ? "left" : "right" }}>
-      <div style={{ fontFamily: F.disp, fontSize: desktop ? 60 : 44, color: P.red, lineHeight: 1 }}>{count}</div>
-      <div style={{ fontSize: desktop ? 15 : 12, fontWeight: 700, letterSpacing: ".1em", marginTop: desktop ? 4 : 0 }}>뽑은 스틱</div>
+      <div style={{ fontFamily: F.disp, fontSize: desktop ? 60 : 44, color: P.red, lineHeight: 1 }}>{toppled ? 0 : left}<span style={{ fontSize: desktop ? 24 : 18, marginLeft: 4 }}>/{MAX_LAYERS}</span></div>
+      <div style={{ fontSize: desktop ? 15 : 12, fontWeight: 700, letterSpacing: ".1em", marginTop: desktop ? 4 : 0 }}>남은 층</div>
     </div>
   );
   const status = toppled ? (
     <>
       <div style={{ fontFamily: F.disp, fontSize: desktop ? 34 : 26, color: P.red, animation: "floaty 1.4s ease-in-out infinite" }}>くずれた！</div>
-      <div style={{ marginTop: 6, fontSize: desktop ? 16 : 13, fontWeight: 700, letterSpacing: ".14em", color: P.green, opacity: .8 }}>무너졌어요!</div>
+      <div style={{ marginTop: 6, fontSize: desktop ? 16 : 13, fontWeight: 700, letterSpacing: ".14em", color: P.green, opacity: .8 }}>{tower.length}층에서 무너졌어요!</div>
+      <button className="btn" onClick={reset} style={{ marginTop: 12, background: P.green, color: P.cream, boxShadow: `0 4px 0 ${P.greenDeep}`, fontSize: desktop ? 16 : 14, padding: desktop ? "12px 24px" : "10px 18px" }}>다시 쌓기</button>
+    </>
+  ) : done ? (
+    <>
+      <div style={{ fontFamily: F.disp, fontSize: desktop ? 34 : 26, color: P.green, animation: "floaty 1.4s ease-in-out infinite" }}>かんせい！</div>
+      <div style={{ marginTop: 6, fontSize: desktop ? 16 : 13, fontWeight: 700, letterSpacing: ".14em", color: P.green, opacity: .8 }}>{MAX_LAYERS}층 완성! 다 쌓았어요</div>
       <button className="btn" onClick={reset} style={{ marginTop: 12, background: P.green, color: P.cream, boxShadow: `0 4px 0 ${P.greenDeep}`, fontSize: desktop ? 16 : 14, padding: desktop ? "12px 24px" : "10px 18px" }}>다시 쌓기</button>
     </>
   ) : tower.length === 0 ? (
-    <div style={{ fontSize: desktop ? 16 : 13, fontWeight: 700, color: P.green, animation: "floaty 1.6s ease-in-out infinite" }}>{desktop ? "스틱을 눌러 뽑기 →" : "← 스틱을 눌러 뽑기"}</div>
+    <div style={{ fontSize: desktop ? 16 : 13, fontWeight: 700, color: P.green, animation: "floaty 1.6s ease-in-out infinite" }}>{desktop ? "스틱을 잡고 접시로 끌어오세요 →" : "← 스틱을 잡고 접시로 끌어오세요"}</div>
   ) : (
     <>
-      <div style={{ fontFamily: F.disp, fontSize: desktop ? 34 : 26, color: P.green }}>{tower.length}층</div>
-      {tower.length >= 5 && <div style={{ marginTop: 4, fontSize: desktop ? 15 : 12, fontWeight: 700, color: P.red }}>위태위태…</div>}
-      <button className="btn" onClick={topple} style={{ marginTop: 12, background: "transparent", color: P.green, border: `2px solid ${P.green}`, fontSize: desktop ? 14 : 12, padding: desktop ? "8px 18px" : "6px 14px" }}>무너뜨리기</button>
+      <div style={{ fontFamily: F.disp, fontSize: desktop ? 34 : 26, color: shaky ? P.red : P.green }}>{tower.length}층</div>
+      {shaky && <div style={{ marginTop: 4, fontSize: desktop ? 15 : 12, fontWeight: 700, color: P.red, animation: "floaty .7s ease-in-out infinite" }}>위태위태…</div>}
+      <button className="btn" onClick={() => topple(st.dir)} style={{ marginTop: 12, background: "transparent", color: P.green, border: `2px solid ${P.green}`, fontSize: desktop ? 14 : 12, padding: desktop ? "8px 18px" : "6px 14px" }}>무너뜨리기</button>
     </>
   );
   const play = (
-    <main style={desktop
-      ? { position: "relative", display: "grid", gridTemplateColumns: "1fr 1fr", alignItems: "end", width: 760, height: 440, padding: "0 24px", transform: `scale(${k})`, transformOrigin: "center center", flexShrink: 0 }
-      : { position: "relative", display: "grid", gridTemplateColumns: "1fr 1fr", alignItems: "end", minHeight: 500, padding: "0 24px 40px", maxWidth: 900, margin: "0 auto" }}>
+    <main style={{ position: "relative", display: "grid", gridTemplateColumns: "1fr 1fr", alignItems: "end", width: PLAY_W, height: PLAY_H, padding: desktop ? "0 24px" : "0 6px", transform: `scale(${k})`, transformOrigin: "center center", flexShrink: 0, touchAction: "none" }}>
       <div style={{ position: "relative", height: 420, display: "flex", justifyContent: "center", alignItems: "flex-end" }}>
         <div onClick={shake} role="button" aria-label="컵 흔들기" style={{ position: "relative", width: CUP.w, height: CUP.h, animation: rattle ? "rattle .12s linear 4" : "none", cursor: "pointer" }}>
           {/* 바닥 그림자 */}
@@ -692,11 +778,10 @@ function PotatoScene({ onBack }) {
           {/* 스틱: 컵 뒤에 세 줄로 서 있고, 각 스틱은 포인터 따라 기울어지는 3D */}
           <div style={{ position: "absolute", left: CUP.cx, top: CUP.cy, width: 0, height: 0 }}>
             {cupSticks.map((s) => (
-              <div key={s.id} style={{ position: "absolute", left: s.x, top: s.top, zIndex: s.row + 1, transform: `rotate(${s.tilt}deg)`, transformOrigin: "50% 40px" }}>
-                <button className="stickBtn" onClick={(e) => { e.stopPropagation(); pull(s.id); }} aria-label="스틱 뽑기" style={{ animation: s.fresh ? "rise .45s cubic-bezier(.2,.9,.3,1.2)" : rattle ? "rattle .12s linear 4" : "none" }}><Stick3D flip={s.flip} /></button>
+              <div key={s.id} style={{ position: "absolute", left: s.x, top: s.top, zIndex: s.row + 1, transform: `rotate(${s.tilt}deg)`, transformOrigin: "50% 40px", opacity: held && held.id === s.id ? 0 : 1 }}>
+                <button className="stickBtn" data-silent onPointerDown={(e) => grab(e, s)} onClick={(e) => e.stopPropagation()} aria-label="스틱 잡기" style={{ animation: s.fresh ? "rise .45s cubic-bezier(.2,.9,.3,1.2)" : rattle ? "rattle .12s linear 4" : "none" }}><Stick3D flip={s.flip} /></button>
               </div>
             ))}
-            {flying && <div style={{ position: "absolute", left: flying.x, top: flying.top, zIndex: 9, "--dx": "300px", "--dy": `${40 - tower.length * 22}px`, animation: "fly .52s cubic-bezier(.3,.8,.4,1) forwards", pointerEvents: "none" }}><StickImg /></div>}
           </div>
           {/* 컵 (정면) — 스틱 아랫부분을 가린다 */}
           <img src={CUP_REAL_IMG} alt="" draggable={false} style={{ position: "absolute", inset: 0, width: "100%", height: "100%", pointerEvents: "none", zIndex: 5 }} />
@@ -707,54 +792,86 @@ function PotatoScene({ onBack }) {
         {/* 접시 — 바닥 그림자 + 사진 */}
         <div style={{ position: "absolute", bottom: 6, width: PLATE_W * .9, height: 30, borderRadius: "50%", background: "radial-gradient(ellipse at 50% 50%, rgba(60,30,0,.30), rgba(60,30,0,0) 70%)" }} />
         <img src={PLATE_IMG} alt="" draggable={false} style={{ position: "absolute", bottom: 0, width: PLATE_W, height: PLATE_H, pointerEvents: "none", filter: "drop-shadow(0 4px 4px rgba(60,30,0,.18))" }} />
-        <div style={{ position: "absolute", bottom: TOWER_BOTTOM, display: "flex", flexDirection: "column-reverse", alignItems: "center", "--amp": amp, animation: tower.length ? `wobble ${Math.max(0.6, 1.8 - tower.length * 0.15)}s ease-in-out infinite` : "none", transformOrigin: "bottom center" }}>
-          {tower.map((layer, i) => (
-            <div key={layer.id} style={{ marginTop: 2, display: "flex", gap: 10, animation: toppled ? "fall .7s cubic-bezier(.4,0,.8,1) forwards" : "none", "--x": `${rand(-140, 140)}px`, "--r": `${rand(-120, 120)}deg`, transform: `rotate(${layer.wob}deg)` }}>
-              {i % 2 === 0 ? <StickSide w={116} h={20} /> : [0, 1, 2].map((k) => <StickEnd key={k} />)}
+
+        {/* 탑 — 접시 안쪽 중심을 기준점으로 두고 층을 절대 배치한다 */}
+        <div ref={anchorRef} style={{ position: "absolute", bottom: TOWER_BOTTOM, left: "50%", width: 0, height: 0 }}>
+          <div style={{ position: "absolute", left: 0, bottom: 0, width: 0, height: 0, transform: `rotate(${lean}deg)`, transformOrigin: "0 0", transition: "transform .35s cubic-bezier(.3,.9,.4,1.2)" }}>
+            {/* 놓을 자리 가이드 — 끌고 있는 동안만 보인다 */}
+            {aiming && (
+              <div style={{ position: "absolute", left: 0, bottom: tower.length * LAYER_STEP, width: 0, height: 0, pointerEvents: "none", zIndex: 20 }}>
+                <div style={{ position: "absolute", left: topX - guideW, bottom: -4, width: guideW * 2, height: 3, borderRadius: 2, background: okNow ? P.green : P.red, opacity: .55, transition: "background .15s" }} />
+                <div style={{ position: "absolute", left: topX - 1, bottom: -10, width: 2, height: 15, borderRadius: 1, background: okNow ? P.green : P.red, opacity: .45 }} />
+                <div style={{ position: "absolute", left: snapX - LAYER_W / 2, bottom: 1, opacity: okNow ? .55 : .35, filter: okNow ? "none" : "grayscale(.7)" }}><Layer /></div>
+              </div>
+            )}
+            {/* 층 — 흔들림은 조준하는 동안 멈춘다 */}
+            <div style={{ position: "absolute", left: 0, bottom: 0, width: 0, height: 0, "--amp": amp, animation: tower.length && !held && !toppled && !done ? `wobble ${Math.max(0.6, 1.8 - tower.length * 0.15)}s ease-in-out infinite` : "none", transformOrigin: "0 0" }}>
+              {tower.map((layer, i) => (
+                <div key={layer.id} style={{ position: "absolute", left: layer.x - LAYER_W / 2, bottom: i * LAYER_STEP, width: LAYER_W, height: LAYER_H, zIndex: 10 - i, animation: toppled ? `tumble .62s cubic-bezier(.4,0,.7,1) ${(tower.length - 1 - i) * 0.035}s forwards` : "none", "--x": `${layer.fx || 0}px`, "--y": `${layer.fy || 0}px`, "--r": `${layer.fr || 0}deg` }}>
+                  <div style={{ position: "relative", transform: `rotate(${layer.wob}deg)`, animation: !toppled && flash === i + 1 ? "placePop .3s cubic-bezier(.3,.9,.4,1.4)" : "none" }}>
+                    <Layer />
+                  </div>
+                </div>
+              ))}
             </div>
-          ))}
+          </div>
         </div>
+
         {particles.map((p) => (
           <div key={p.id} style={{ position: "absolute", bottom: TOWER_BOTTOM + 30, left: "50%", "--x": `${p.x}px`, "--y": `${p.y}px`, "--r": `${p.r}deg`, "--s": p.s, animation: `pop 1.1s ease-out ${p.d}s forwards`, opacity: 0, pointerEvents: "none" }}>
             {p.kind === "word" ? <span style={{ fontFamily: F.disp, color: P.red, fontSize: 18, textShadow: `2px 2px 0 ${P.cream}` }}>サラダ！</span> : p.kind === "fleck" ? <div style={{ width: 8, height: 8, borderRadius: 3, background: P.fleck }} /> : <div style={{ width: 12, height: 9, borderRadius: 3, background: P.cream, boxShadow: `inset 0 -2px 0 ${P.creamDeep}` }} />}
           </div>
         ))}
-        {!desktop && <div style={{ position: "absolute", top: 20, right: 0, textAlign: "right" }}>{status}</div>}
       </div>
     </main>
   );
 
+  // 손에 들린 스틱 — 화면 좌표를 그대로 따라다닌다
+  const inHand = held && (
+    <div style={{ position: "fixed", left: held.px, top: held.py, zIndex: 60, pointerEvents: "none", transform: `translate(-50%, -50%) scale(${k * (held.over ? 1 : .88)}) rotate(${held.over ? 0 : -16}deg)`, transition: "transform .18s", filter: "drop-shadow(0 8px 8px rgba(60,30,0,.3))" }}>
+      <Layer />
+    </div>
+  );
+
   if (desktop) {
     return (
-      <div className="scene" style={{ height: "100vh", display: "grid", gridTemplateColumns: GAME_COLS, background: P.butter, color: P.greenDeep, overflow: "hidden" }}>
-        <SidePanel bg="#FFF9DD" border={P.green} color={P.greenDeep}>
-          <TopBar index="03" title="じゃがりこ" color={P.green} onBack={onBack} />
-          <div style={{ ...PANEL_BODY, paddingLeft: 40 }}>
-            <div style={{ ...PANEL_GROUP, margin: "7vh 0 auto" }}>
-              {title}
-              {score}
-              {/* 탑 상태 — 점수 바로 아래 (애니멀의 비스킷 격자와 같은 자리) */}
-              <div style={{ marginTop: 14 }}>{status}</div>
+      <>
+        <div className="scene" style={{ height: "100vh", display: "grid", gridTemplateColumns: GAME_COLS, background: P.butter, color: P.greenDeep, overflow: "hidden", cursor: held ? "grabbing" : "auto" }}>
+          <SidePanel bg="#FFF9DD" border={P.green} color={P.greenDeep}>
+            <TopBar index="03" title="じゃがりこ" color={P.green} onBack={onBack} />
+            <div style={{ ...PANEL_BODY, paddingLeft: 40 }}>
+              <div style={{ ...PANEL_GROUP, margin: "7vh 0 auto" }}>
+                {title}
+                {scoreBox}
+                {/* 탑 상태 — 점수 바로 아래 (애니멀의 비스킷 격자와 같은 자리) */}
+                <div style={{ marginTop: 14 }}>{status}</div>
+              </div>
             </div>
-          </div>
-        </SidePanel>
-        <section ref={areaRef} style={{ position: "relative", overflow: "hidden", display: "flex", alignItems: "center", justifyContent: "center" }}>
-          {pattern}
-          {play}
-        </section>
-      </div>
+          </SidePanel>
+          <section ref={areaRef} style={{ position: "relative", overflow: "hidden", display: "flex", alignItems: "center", justifyContent: "center" }}>
+            {pattern}
+            {play}
+          </section>
+        </div>
+        {inHand}
+      </>
     );
   }
   return (
-    <div className="scene" style={{ minHeight: "100vh", background: P.butter, color: P.greenDeep, overflow: "hidden", position: "relative" }}>
-      {pattern}
-      <TopBar index="03" color={P.green} onBack={onBack} />
-      <header style={{ position: "relative", padding: "12px 24px 0", display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: 12 }}>
-        {title}
-        {score}
-      </header>
-      {play}
-    </div>
+    <>
+      <div className="scene" style={{ height: "100dvh", minHeight: 560, background: P.butter, color: P.greenDeep, overflow: "hidden", position: "relative", display: "flex", flexDirection: "column" }}>
+        {pattern}
+        <TopBar index="03" color={P.green} onBack={onBack} />
+        <header style={{ position: "relative", padding: "12px 24px 0", display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: 12 }}>
+          {title}
+          <div style={{ textAlign: "right" }}>{scoreBox}<div style={{ marginTop: 10 }}>{status}</div></div>
+        </header>
+        <section ref={areaRef} style={{ position: "relative", flex: 1, minHeight: 0, display: "flex", alignItems: "flex-end", justifyContent: "center", overflow: "hidden", paddingBottom: 10 }}>
+          {play}
+        </section>
+      </div>
+      {inHand}
+    </>
   );
 }
 
@@ -803,7 +920,7 @@ function MushroomScene({ onBack }) {
         {spots.map((s) => {
           const gone = capped.has(s.id);
           return (
-            <div key={s.id} className="shroom" role="button" tabIndex={0} aria-label="버섯 갓 떼기" onClick={() => !gone && popCap(s.id)} onKeyDown={(e) => e.key === "Enter" && !gone && popCap(s.id)} style={{ position: "absolute", left: `${(desktop ? 4 + s.i * 8.8 : 8 + s.i * 12) + s.j}%`, bottom: `${s.y}%`, transform: `scale(${s.size * k})`, transformOrigin: "bottom center" }}>
+            <div key={s.id} className="shroom" role="button" data-silent tabIndex={0} aria-label="버섯 갓 떼기" onClick={() => !gone && popCap(s.id)} onKeyDown={(e) => e.key === "Enter" && !gone && popCap(s.id)} style={{ position: "absolute", left: `${(desktop ? 4 + s.i * 8.8 : 8 + s.i * 12) + s.j}%`, bottom: `${s.y}%`, transform: `scale(${s.size * k})`, transformOrigin: "bottom center" }}>
               <div style={{ position: "relative", width: 56, height: 90, animation: `sprout .6s cubic-bezier(.2,.9,.3,1.3) ${s.delay}s both`, transformOrigin: "bottom center" }}>
                 {/* cap */}
                 <div style={{ position: "absolute", top: 0, left: 0, width: 56, height: 40, borderRadius: "28px 28px 8px 8px", background: `linear-gradient(135deg, ${M.chocoLite}, ${M.choco} 60%)`, boxShadow: "inset 4px 4px 6px rgba(255,255,255,.18), 0 3px 0 #2A1508", animation: gone ? "capDrop .8s cubic-bezier(.5,0,.9,.6) forwards" : "none", "--x": `${rand(-40, 40)}px`, "--r": `${rand(-200, 200)}deg`, zIndex: 2 }} />
@@ -906,13 +1023,13 @@ function AnimalsScene({ onBack }) {
   function pick(a) {
     if (status !== "ask") return;
     if (a === current) {
-      setStatus("right"); setScore((s) => s + 1);
+      setStatus("right"); setScore((s) => s + 1); playRight();
       setTimeout(() => {
-        if (idx + 1 >= order.length) setStatus("done");
+        if (idx + 1 >= order.length) { setStatus("done"); playClear(); } // 여섯 마리 다 맞히면 축하 멜로디
         else { setIdx((i) => i + 1); setStatus("ask"); }
       }, 1000);
     } else {
-      setWrongPick(a.name); setStatus("wrong");
+      setWrongPick(a.name); setStatus("wrong"); playWrong();
       setTimeout(() => { setStatus("ask"); setWrongPick(null); }, 500);
     }
   }
@@ -956,7 +1073,7 @@ function AnimalsScene({ onBack }) {
           const isRight = revealed && a === current;
           const isWrong = wrongPick === a.name;
           return (
-            <button key={a.name} className="btn" onClick={() => pick(a)} style={{ background: isRight ? A.yellow : isWrong ? A.pinkDeep : "#fff", color: isRight ? A.ink : isWrong ? "#fff" : A.pinkDeep, fontFamily: F.disp, fontSize: 18, letterSpacing: ".12em", padding: "14px", boxShadow: `0 4px 0 ${A.pinkDeep}`, whiteSpace: "nowrap", alignSelf: "start" }}>
+            <button key={a.name} className="btn" data-silent onClick={() => pick(a)} style={{ background: isRight ? A.yellow : isWrong ? A.pinkDeep : "#fff", color: isRight ? A.ink : isWrong ? "#fff" : A.pinkDeep, fontFamily: F.disp, fontSize: 18, letterSpacing: ".12em", padding: "14px", boxShadow: `0 4px 0 ${A.pinkDeep}`, whiteSpace: "nowrap", alignSelf: "start" }}>
               {a.name}{isRight && <span style={{ display: "block", fontFamily: F.body, fontSize: 12, letterSpacing: 0, marginTop: 2, wordBreak: "keep-all", whiteSpace: "nowrap" }}>{a.ko}</span>}
             </button>
           );
@@ -1170,7 +1287,7 @@ function Entrance({ onEnter }) {
     </div>
   );
   const door = (
-    <div onClick={enter} role="button" aria-label="편의점 입장" style={{ position: "absolute", inset: desktop ? "14px 0 0" : "0 4vw 7vh", cursor: opened ? "default" : "pointer" }}>
+    <div onClick={enter} role="button" data-silent aria-label="편의점 입장" style={{ position: "absolute", inset: desktop ? "14px 0 0" : "0 4vw 7vh", cursor: opened ? "default" : "pointer" }}>
       {/* 문 뒤로 보이는 매장 내부 (열리면 밝아짐) */}
       <Interior lit={opened} />
       <DoorPanel side="left" opened={opened} />
@@ -1231,6 +1348,15 @@ function Entrance({ onEnter }) {
 export default function SnackCorner() {
   const [scene, setScene] = useState(() => new URLSearchParams(window.location.search).get("scene") || "entrance"); // ?scene=shelf 로 바로 진입 (개발용)
   const back = () => setScene("shelf");
+  // 모든 버튼에 공용 클릭음 — 자기 효과음이 있는 버튼(data-silent)은 제외. 캡처 단계라 stopPropagation 과 무관하다
+  useEffect(() => {
+    const onClick = (e) => {
+      const el = e.target.closest?.('button, [role="button"]');
+      if (el && !el.disabled && !el.hasAttribute("data-silent")) playTick();
+    };
+    document.addEventListener("click", onClick, true);
+    return () => document.removeEventListener("click", onClick, true);
+  }, []);
   return (
     <div style={{ fontFamily: F.body }}>
       <style>{GLOBAL_CSS}</style>
