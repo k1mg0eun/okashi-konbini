@@ -1042,7 +1042,7 @@ function AnimalsScene({ onBack }) {
     <div>
       <h1 style={{ fontFamily: F.disp, fontSize: desktop ? "clamp(40px, 3.6vw, 56px)" : "clamp(34px, 7vw, 64px)", lineHeight: 1.05, margin: 0, color: A.yellow, textShadow: `3px 3px 0 ${A.pinkDeep}` }}>どうぶつ<br />だあれ？</h1>
       <div style={{ marginTop: desktop ? 16 : 8, fontSize: 13, fontWeight: 700, letterSpacing: ".18em", color: "rgba(255,255,255,.75)" }}>어떤 동물일까?</div>
-      <p style={{ margin: desktop ? "34px 0 0" : "10px 0 0", maxWidth: 320, fontSize: desktop ? 17 : 14, lineHeight: desktop ? 1.85 : 1.6, fontWeight: 700, wordBreak: "keep-all" }}>그림자를 보고 동물을 맞혀 보세요!<br />잡고 돌려 보며 살펴본 뒤 정답을 골라주세요. 정답이면 노릇하게 구워져요!</p>
+      <p style={{ margin: desktop ? "34px 0 0" : "10px 0 0", maxWidth: 320, fontSize: desktop ? 17 : 14, lineHeight: desktop ? 1.85 : 1.6, fontWeight: 700, wordBreak: "keep-all" }}>그림자를 보고 동물을 맞혀 보세요!<br />잡고 돌려 보며 살펴본 뒤 정답을 골라주세요. 맞히면 정체가 공개돼요!</p>
     </div>
   );
   const scoreBox = (
@@ -1061,7 +1061,7 @@ function AnimalsScene({ onBack }) {
       <div style={{ display: "flex", justifyContent: "center", gap: desktop ? 14 : 8, margin: "18px 0", flexWrap: "wrap" }}>
         {ANIMALS.map((a) => <Biscuit key={a.name} animal={a} revealed size={desktop ? 110 : 72} />)}
       </div>
-      <button className="btn" onClick={restart} style={{ background: A.yellow, color: A.ink, boxShadow: `0 5px 0 ${A.pinkDeep}`, fontFamily: F.disp, fontSize: desktop ? 22 : 17, padding: desktop ? "16px 40px" : "12px 28px", marginTop: desktop ? 10 : 0 }}>한 상자 더</button>
+      <button className="btn" onClick={restart} style={{ background: A.yellow, color: A.ink, boxShadow: `0 5px 0 ${A.pinkDeep}`, fontFamily: F.disp, fontSize: desktop ? 22 : 17, padding: desktop ? "8px 36px" : "12px 28px", marginTop: desktop ? 10 : 0 }}>다시하기</button>
     </div>
   ) : (
     <>
