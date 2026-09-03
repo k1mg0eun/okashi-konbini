@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useMemo } from "react";
-import { playChimeThenBgm, playCrunch, playStickGrab, playStickPlace, playStickTopple, playClear, playTick, playRight, playWrong, playDrink, playRestock, playFridge } from "./sounds.js";
+import { playChimeThenBgm, playCrunch, playStickGrab, playStickPlace, playStickTopple, playClear, playTick, playRight, playWrong, playDrink, playRestock, playFridge, playMeow } from "./sounds.js";
 import CUP_IMG from "./assets/cup.png";
 import CUP_OPEN_IMG from "./assets/cup-open.png";
 import CUP_REAL_IMG from "./assets/cup-real.png"; // 실제 컵 사진 (살짝 위에서, 배경 투명)
@@ -66,6 +66,22 @@ const GLOBAL_CSS = `
   @keyframes openPop { 0% { transform: translateX(-50%) scale(.96) } 60% { transform: translateX(-50%) scale(1.02) } 100% { transform: translateX(-50%) scale(1) } }
   @keyframes openPopL { 0% { transform: scale(.96) } 60% { transform: scale(1.02) } 100% { transform: scale(1) } }
   @keyframes swing { 0%,100% { transform: rotate(-3deg) } 50% { transform: rotate(3deg) } }
+  @keyframes catBreathe { 0%,100% { transform: scaleY(1) } 50% { transform: scaleY(1.035) } }
+  @keyframes catZ { 0% { opacity: 0; transform: translate(0, 4px) scale(.8) } 30% { opacity: .9 } 100% { opacity: 0; transform: translate(7px, -16px) scale(1.15) } }
+  @keyframes catEar { 0%,100% { transform: rotate(0) } 25% { transform: rotate(-16deg) } 55% { transform: rotate(9deg) } 80% { transform: rotate(-5deg) } }
+  @keyframes catTail { 0%,100% { transform: rotate(0) } 30% { transform: rotate(-24deg) } 65% { transform: rotate(12deg) } }
+  .cat { cursor: pointer; user-select: none; -webkit-user-select: none; }
+  .cat .cat-body { transform-box: fill-box; transform-origin: 50% 100%; animation: catBreathe 3.4s ease-in-out infinite; }
+  .cat .cat-z { transform-box: fill-box; transform-origin: 50% 50%; animation: catZ 2.6s ease-out infinite; }
+  .cat .cat-z2 { animation-delay: 1.3s; }
+  .cat.poke .cat-z { animation: none; opacity: 0; }
+  .cat .cat-ear-l, .cat .cat-ear-r, .cat .cat-tail { transform-box: fill-box; }
+  .cat .cat-ear-l { transform-origin: 100% 100%; }
+  .cat .cat-ear-r { transform-origin: 0% 100%; }
+  .cat .cat-tail { transform-origin: 0% 100%; }
+  .cat.poke .cat-ear-l { animation: catEar .9s ease; }
+  .cat.poke .cat-ear-r { animation: catEar .9s ease .08s; }
+  .cat.poke .cat-tail { animation: catTail .9s ease; }
   @keyframes zoomIn { from { transform: scale(1) } to { transform: scale(5); opacity: 0 } }
   @keyframes bisIdle { 0%,100% { transform: rotateX(8deg) rotateY(-14deg) } 50% { transform: rotateX(-6deg) rotateY(14deg) } }
   @keyframes bisBake { 0% { transform: rotateX(0) rotateY(0) } 60% { transform: rotateX(-10deg) rotateY(380deg) scale(1.12) } 100% { transform: rotateX(0) rotateY(360deg) scale(1) } }
@@ -215,7 +231,7 @@ function Shelf({ onOpen }) {
         <div style={{ position: "absolute", left: 0, right: 0, top: 0, height: 10, background: "linear-gradient(180deg, #FFFFFF, #E9EDEB)", boxShadow: "0 2px 0 #C9D1CE, 0 12px 28px rgba(255,255,255,.9)", zIndex: 1 }} />
         {/* left: glass window with sign + poster */}
         <div style={{ position: "relative", zIndex: 2, padding: "26px 0 0 22px", display: "flex", flexDirection: "column" }}>
-          <GlassStrip vertical><InfoPoster vertical /></GlassStrip>
+          <GlassStrip vertical><InfoPoster vertical /><BoxPile /></GlassStrip>
         </div>
         {/* right: gondola shelf */}
         <div ref={gondolaRef} style={{ position: "relative", zIndex: 2, padding: "22px 18px 0", display: "flex", flexDirection: "column", justifyContent: "flex-end", minWidth: 0 }}>
@@ -445,12 +461,118 @@ function InfoPoster({ vertical }) {
           <div style={{ marginTop: 8, fontSize: 9, fontWeight: 700, color: "#6B7A83", letterSpacing: ".08em" }}>コーラ · お茶 · ジュース · 牛乳</div>
         </div>
       )}
-      {vertical && (
-        <div style={{ marginTop: 20, width: 200, background: A.yellow, color: "#D0021B", border: `2px solid ${A.pinkDeep}`, borderRadius: 4, padding: "8px 10px", textAlign: "center", fontFamily: "'Noto Sans JP', sans-serif", fontWeight: 900, transform: "rotate(1.5deg)", boxShadow: "0 2px 0 rgba(0,0,0,.15)" }}>
-          <div style={{ fontSize: 10, color: A.pinkDeep, letterSpacing: ".1em" }}>おかし</div>
-          <div style={{ fontSize: 22, lineHeight: 1.05 }}>セール中！</div>
-        </div>
-      )}
+    </div>
+  );
+}
+
+// 골판지 택배 상자 — 정면에서 본 납작한 2D 일러스트 (윗뚜껑 띠 + 가운데 테이프 + 인쇄 마크)
+function CardboardBox({ w = 150, h = 100, style }) {
+  const edge = "#8A6437", lid = Math.round(h * 0.2);
+  return (
+    <div style={{ position: "relative", width: w, height: h, background: "linear-gradient(180deg, #D8B279, #CBA066)", border: `2px solid ${edge}`, borderRadius: 3, boxSizing: "border-box", overflow: "hidden", flexShrink: 0, ...style }}>
+      {/* 골판지 결 */}
+      <div style={{ position: "absolute", inset: 0, background: "repeating-linear-gradient(90deg, transparent 0 6px, rgba(0,0,0,.035) 6px 7px)", pointerEvents: "none" }} />
+      {/* 윗뚜껑 띠 */}
+      <div style={{ position: "absolute", left: 0, right: 0, top: 0, height: lid, background: "linear-gradient(180deg, #E6C48F, #D8B279)", borderBottom: `2px solid ${edge}` }} />
+      {/* 가운데 테이프 */}
+      <div style={{ position: "absolute", top: 0, bottom: 0, left: "50%", width: Math.round(w * 0.11), marginLeft: -Math.round(w * 0.055), background: "rgba(255,248,230,.45)", borderLeft: "1px solid rgba(0,0,0,.10)", borderRight: "1px solid rgba(0,0,0,.10)" }} />
+      {/* 인쇄 마크: 이 면이 위 / 줄무늬 */}
+      <div style={{ position: "absolute", right: 10, top: lid + 8, fontSize: Math.round(h * 0.18), lineHeight: 1, fontWeight: 900, color: edge, opacity: .5, letterSpacing: "-.05em" }}>⇧⇧</div>
+      <div style={{ position: "absolute", left: 10, bottom: 10, width: Math.round(w * 0.26), height: 5, borderRadius: 2, background: edge, opacity: .28 }} />
+      <div style={{ position: "absolute", left: 10, bottom: 19, width: Math.round(w * 0.16), height: 5, borderRadius: 2, background: edge, opacity: .28 }} />
+      {/* 바닥 쪽 살짝 어둡게 */}
+      <div style={{ position: "absolute", left: 0, right: 0, bottom: 0, height: 8, background: "rgba(0,0,0,.06)" }} />
+    </div>
+  );
+}
+
+// 상자 위에서 웅크려 자는 회색 고양이 — 숨 쉬듯 배가 오르내리고, 클릭하면 귀·꼬리를 움찔하며 잠깐 눈을 뜬다
+function SleepingCat({ width = 150, style }) {
+  const [poke, setPoke] = useState(false);
+  const fur = "#A9B3BD", furDark = "#7C8894", furLight = "#E6EBEF", pink = "#F2A2B0", ink = "#3C4650";
+  const onPoke = () => { if (poke) return; playMeow(); setPoke(true); setTimeout(() => setPoke(false), 900); };
+  return (
+    <svg className={`cat${poke ? " poke" : ""}`} viewBox="0 0 170 90" width={width} height={width * 90 / 170} style={{ display: "block", overflow: "visible", ...style }} onClick={onPoke} onPointerDown={e => e.stopPropagation()}>
+      {/* zzz */}
+      <text className="cat-z" x="72" y="26" fontFamily="'Mochiy Pop One', 'Zen Maru Gothic', sans-serif" fontSize="13" fill={ink} opacity=".8">z</text>
+      <text className="cat-z cat-z2" x="84" y="16" fontFamily="'Mochiy Pop One', 'Zen Maru Gothic', sans-serif" fontSize="10" fill={ink} opacity=".8">z</text>
+      <g className="cat-body">
+        {/* 꼬리 — 몸 앞쪽을 감싸듯 */}
+        <g className="cat-tail">
+          <path d="M126 84 C 160 88, 170 62, 152 55 C 143 52, 138 62, 147 65" fill="none" stroke={fur} strokeWidth="10" strokeLinecap="round" />
+          <path d="M126 84 C 160 88, 170 62, 152 55 C 143 52, 138 62, 147 65" fill="none" stroke={furDark} strokeWidth="10" strokeLinecap="round" strokeDasharray="5 11" strokeDashoffset="-14" opacity=".55" />
+        </g>
+        {/* 몸통(식빵 자세) */}
+        <ellipse cx="95" cy="62" rx="58" ry="26" fill={fur} />
+        <path d="M100 38 q7 11 2 24" fill="none" stroke={furDark} strokeWidth="6" strokeLinecap="round" opacity=".7" />
+        <path d="M119 41 q7 11 2 22" fill="none" stroke={furDark} strokeWidth="6" strokeLinecap="round" opacity=".7" />
+        <path d="M137 49 q5 9 0 18" fill="none" stroke={furDark} strokeWidth="5" strokeLinecap="round" opacity=".7" />
+        {/* 앞발 */}
+        <rect x="50" y="75" width="24" height="12" rx="6" fill={fur} />
+        <rect x="76" y="77" width="22" height="11" rx="5.5" fill={fur} />
+        <path d="M58 87 v-4 M66 87 v-4 M84 88 v-4 M91 88 v-4" stroke={furDark} strokeWidth="1.5" strokeLinecap="round" opacity=".6" />
+        {/* 머리 */}
+        <g>
+          <g className="cat-ear-l">
+            <path d="M20 40 L17 11 L39 27 Z" fill={fur} />
+            <path d="M23 36 L21 18 L34 28 Z" fill={pink} opacity=".8" />
+          </g>
+          <g className="cat-ear-r">
+            <path d="M64 40 L67 11 L45 27 Z" fill={fur} />
+            <path d="M61 36 L63 18 L50 28 Z" fill={pink} opacity=".8" />
+          </g>
+          <circle cx="42" cy="52" r="26" fill={fur} />
+          <path d="M35 30 v9 M42 28 v10 M49 30 v9" stroke={furDark} strokeWidth="3" strokeLinecap="round" opacity=".7" />
+          <ellipse cx="42" cy="61" rx="15" ry="10" fill={furLight} />
+          {/* 눈 — 자는 중엔 감고, 건드리면 살짝 뜸 */}
+          {poke ? (
+            <>
+              <ellipse cx="32" cy="50" rx="3.2" ry="4" fill={ink} />
+              <ellipse cx="52" cy="50" rx="3.2" ry="4" fill={ink} />
+              <circle cx="33" cy="48.5" r="1" fill="#fff" />
+              <circle cx="53" cy="48.5" r="1" fill="#fff" />
+            </>
+          ) : (
+            <>
+              <path d="M26 50 q6 5 12 0" fill="none" stroke={ink} strokeWidth="2.5" strokeLinecap="round" />
+              <path d="M46 50 q6 5 12 0" fill="none" stroke={ink} strokeWidth="2.5" strokeLinecap="round" />
+            </>
+          )}
+          <path d="M39 57 h6 l-3 3.5 z" fill={pink} />
+          <path d="M42 60.5 q-3 4 -6 2 M42 60.5 q3 4 6 2" fill="none" stroke={ink} strokeWidth="1.5" strokeLinecap="round" />
+          <path d="M22 58 l-12 -2 M22 62 l-12 2 M62 58 l12 -2 M62 62 l12 2" stroke={ink} strokeWidth="1.2" strokeLinecap="round" opacity=".55" />
+        </g>
+      </g>
+    </svg>
+  );
+}
+
+// 유리창 아래 쌓아둔 택배 상자 2단 (데스크톱 전용) — 바닥선에 딱 붙이고, 남은 높이가 모자라면 통째로 축소
+function BoxPile() {
+  const B = { w: 240, h: 145 }, T = { w: 166, h: 102 };
+  const padTop = 8, padBottom = 20; // padBottom: GlassStrip의 하단 패딩만큼 내려 바닥선에 붙임
+  const CAT = 74; // 위 상자 위 고양이 높이(zzz 포함)
+  const W = B.w, H = B.h + T.h + CAT;
+  const ref = useRef(null);
+  const [scale, setScale] = useState(1);
+  useEffect(() => {
+    const el = ref.current; if (!el) return;
+    const fit = () => setScale(Math.max(.45, Math.min(1, (el.clientHeight + padBottom - padTop) / H)));
+    fit();
+    const ro = new ResizeObserver(fit); ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+  return (
+    <div ref={ref} style={{ flex: 1, minHeight: 0, position: "relative", width: "100%" }}>
+      <div style={{ position: "absolute", left: "50%", bottom: -padBottom, transform: `translateX(-50%) scale(${scale})`, transformOrigin: "bottom center", width: W, height: H, overflow: "visible" }}>
+        {/* 바닥 그림자 */}
+        <div style={{ position: "absolute", left: -6, right: -6, bottom: -3, height: 12, background: "radial-gradient(ellipse at center, rgba(0,0,0,.24), transparent 72%)", filter: "blur(2px)" }} />
+        <CardboardBox w={B.w} h={B.h} style={{ position: "absolute", left: 0, bottom: 0 }} />
+        {/* 위 상자 — 살짝 왼쪽으로 치우쳐 얹힘 */}
+        <CardboardBox w={T.w} h={T.h} style={{ position: "absolute", left: 20, bottom: B.h - 2 }} />
+        {/* 위 상자 위에서 자는 고양이 */}
+        <SleepingCat width={150} style={{ position: "absolute", left: 20 + (T.w - 150) / 2, bottom: B.h - 2 + T.h - 3 }} />
+      </div>
     </div>
   );
 }
@@ -1061,7 +1183,7 @@ function AnimalsScene({ onBack }) {
       <div style={{ display: "flex", justifyContent: "center", gap: desktop ? 14 : 8, margin: "18px 0", flexWrap: "wrap" }}>
         {ANIMALS.map((a) => <Biscuit key={a.name} animal={a} revealed size={desktop ? 110 : 72} />)}
       </div>
-      <button className="btn" onClick={restart} style={{ background: A.yellow, color: A.ink, boxShadow: `0 5px 0 ${A.pinkDeep}`, fontFamily: F.disp, fontSize: desktop ? 22 : 17, padding: desktop ? "8px 36px" : "12px 28px", marginTop: desktop ? 10 : 0 }}>다시하기</button>
+      <button className="btn" onClick={restart} style={{ background: A.yellow, color: A.ink, boxShadow: `0 5px 0 ${A.pinkDeep}`, fontFamily: F.disp, fontSize: desktop ? 18 : 17, padding: desktop ? "8px 36px" : "12px 28px", marginTop: desktop ? 10 : 0 }}>다시하기</button>
     </div>
   ) : (
     <>

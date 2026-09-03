@@ -48,3 +48,8 @@ export function playWrong() { playOnce(wrongUrl, 0.6); }
 export function playDrink() { playOnce(drinkUrl, 0.3); }
 export function playRestock() { playOnce(restockUrl, 0.7); }
 export function playFridge() { playOnce(fridgeUrl, 0.6); }
+
+// 상자 위 고양이: 클릭하면 "야옹". src/assets/sounds/meow.mp3 (또는 .wav) 를 넣으면 자동으로 붙고, 없으면 조용히 넘어간다
+const meowFiles = import.meta.glob("./assets/sounds/meow.{mp3,wav,m4a,ogg}", { eager: true, query: "?url", import: "default" });
+const meowUrl = Object.values(meowFiles)[0];
+export function playMeow() { if (meowUrl) playOnce(meowUrl, 0.6); }
