@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useMemo } from "react";
-import { playChimeThenBgm, playCrunch, playStickGrab, playStickPlace, playStickTopple, playClear, playTick, playRight, playWrong, playDrink, playRestock, playFridge, playMeow } from "./sounds.js";
+import { playChimeThenBgm, playCrunch, playStickGrab, playStickPlace, playStickTopple, playClear, playTick, playRight, playWrong, playDrink, playRestock, playFridge, playMeow, playCapCatch, playCapMiss } from "./sounds.js";
 import CUP_IMG from "./assets/cup.png";
 import CUP_OPEN_IMG from "./assets/cup-open.png";
 import CUP_REAL_IMG from "./assets/cup-real.png"; // 실제 컵 사진 (살짝 위에서, 배경 투명)
@@ -254,11 +254,19 @@ function Shelf({ onOpen }) {
 // ── 음료 냉장고 (데스크톱) — 유리문 2짝, 클릭하면 경첩 기준으로 열린다. 음료는 임시 CSS 목업 ──
 // 한 단 = 한 종류. 실제 음료 이미지가 오면 kind/color 대신 img로 교체하면 된다.
 const DRINK_ROWS = [
-  { kind: "can", colors: ["#D8232A", "#D8232A", "#D8232A", "#1B5DB8", "#1B5DB8", "#1B5DB8", "#0B7A3B", "#0B7A3B", "#111"] , tags: [{ name: "コーラ", sub: "缶 350ml", jan: "4902102072618", price: 140 }, { name: "サイダー", sub: "缶 350ml", jan: "4901340002807", price: 130 }] },
+  { kind: "can", colors: ["#D8232A", "#D8232A", "#D8232A", "#1B5DB8", "#1B5DB8", "#1B5DB8", "#0B7A3B", "#0B7A3B", "#0B7A3B"] , tags: [{ name: "コーラ", sub: "缶 350ml", jan: "4902102072618", price: 140 }, { name: "サイダー", sub: "缶 350ml", jan: "4901340002807", price: 130 }] },
   { kind: "pet", colors: ["#BFE3F5", "#BFE3F5", "#BFE3F5", "#BFE3F5", "#8FD0F0", "#8FD0F0", "#3DBE6C", "#3DBE6C"], tags: [{ name: "お茶", sub: "ペットボトル 500ml", jan: "4901085614310", price: 130 }, { name: "水", sub: "ペットボトル 550ml", jan: "4902102113304", price: 110 }] },
   { kind: "pet", colors: ["#F39A1E", "#F39A1E", "#F39A1E", "#F6C62B", "#F6C62B", "#E8442E", "#E8442E", "#7B4DB5"], tags: [{ name: "オレンジジュース", sub: "ペットボトル 470ml", jan: "4902179009623", price: 150 }, { name: "ぶどうジュース", sub: "ペットボトル 470ml", jan: "4902179009630", price: 150 }] },
   { kind: "milk", colors: ["#FFFFFF", "#FFFFFF", "#FFFFFF", "#FFE9A8", "#FFE9A8", "#D7B48A", "#D7B48A", "#F6C5D6"], tags: [{ name: "牛乳", sub: "紙パック 500ml", jan: "4902720049450", price: 130 }, { name: "コーヒー", sub: "紙パック 240ml", jan: "4902720049467", price: 120 }] },
 ];
+
+// 색상 목록을 슬롯 수에 맞춰 고르게 배분 — 같은 색끼리 묶은 뒤, 앞 그룹부터 하나씩 더 받는 식으로 n개를 채운다
+// (슬롯이 줄어도 뒤쪽 색이 통째로 사라지지 않게)
+function spreadColors(colors, n) {
+  const groups = colors.filter((c, i) => i === 0 || c !== colors[i - 1]);
+  const G = groups.length, base = Math.floor(n / G), extra = n % G;
+  return groups.flatMap((c, g) => Array(base + (g < extra ? 1 : 0)).fill(c));
+}
 
 function Drink({ kind, color, h }) {
   const w = kind === "can" ? h * .52 : h * .36;
@@ -322,9 +330,10 @@ function DrinkFridge() {
     const h = Math.round(avail * (r.kind === "can" ? .62 : .86));
     const w = r.kind === "can" ? h * .52 : h * .36;
     const gap = 3;
-    const n = iw ? Math.max(4, Math.floor((iw - 16) / (w + gap))) : 8;
+    const n = iw ? Math.max(4, Math.floor((iw - 16) / (w + gap)) - 1) : 7; // 꽉 채울 수 있는 개수보다 하나 적게 (너무 꽉 차 보이지 않도록)
     nRef.current[i] = n;
     const tick = restock[i] || 0;
+    const slotColors = spreadColors(r.colors, n);
     return (
       <div key={i} style={{ position: "relative", flex: 1, minHeight: 0, display: "flex", flexDirection: "column", justifyContent: "flex-end" }}>
         <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "center", padding: "0 8px", overflow: "hidden" }}>
@@ -332,7 +341,7 @@ function DrinkFridge() {
             const key = `${i}-${k}`, st = picked[key];
             return (
               <div key={`${k}-${tick}`} className={`drinkSlot${st ? " " + st : anyOpen ? " canPick" : ""}${tick && !st ? " restock" : ""}`} onClick={pick(key)} style={{ width: w, marginRight: gap, animationDelay: tick ? `${k * 45}ms` : undefined }}>
-                <Drink kind={r.kind} color={r.colors[k % r.colors.length]} h={h} />
+                <Drink kind={r.kind} color={slotColors[k]} h={h} />
               </div>
             );
           })}
@@ -1002,108 +1011,282 @@ function PotatoScene({ onBack }) {
 // ═════════════════════════════════════════════════════════════
 const M = { choco: "#3E2010", chocoLite: "#7A4620", stem: "#FFF3D6", stemDeep: "#E8D3A6", grass: "#8BC34A", grassDeep: "#5C9A2E", sky: "#FFD84A", dusk: "#F08A5D", night: "#2C2A5E", ink: "#5B3A1E" };
 
+// 갓·줄기 이미지는 선택 사항 — src/assets/mushroom-cap.png / mushroom-stem.png 를 넣으면 자동으로 쓰고, 없으면 CSS 도형으로 그린다
+const MUSH_PART = import.meta.glob("./assets/mushroom-{cap,stem}.png", { eager: true, query: "?url", import: "default" });
+const CAP_IMG = MUSH_PART["./assets/mushroom-cap.png"];
+const STEM_IMG = MUSH_PART["./assets/mushroom-stem.png"];
+const CAP_RATIO = 401 / 435, STEM_RATIO = 511 / 221; // 높이/폭 — 실제 사진 비율 (mushroom-cap.png 435×401, mushroom-stem.png 221×511)
+// 언덕 슬롯 — 뒤 9 · 중간 8 · 앞 7 = 24자리. 갓도 딱 이 수만큼 떨어지고, 전부 받으면 언덕이 가득 찬다
+// x: 화면 폭 기준 %, y: 언덕 띠 높이 기준 % (아래에서), sc: 크기 배율 (앞줄일수록 큼)
+const HILL_SLOTS = (() => {
+  const rows = [
+    { n: 9, y: 54, sc: 0.5, x0: 7, x1: 93 },
+    { n: 8, y: 29, sc: 0.61, x0: 10, x1: 90 },
+    { n: 7, y: 4, sc: 0.72, x0: 13, x1: 87 },
+  ];
+  const out = [];
+  rows.forEach((r, ri) => { for (let i = 0; i < r.n; i++) out.push({ x: r.x0 + (r.x1 - r.x0) * (i / (r.n - 1)), y: r.y, sc: r.sc, z: ri + 1 }); });
+  return out;
+})();
+const N_CAPS = HILL_SLOTS.length;
+const HILL = 0.28;       // 화면 아래 언덕 비율
+// 언덕 윗선의 y (화면 위에서부터). 언덕 div 는 좌우로 10% 씩 삐져나가고 border-radius "50% 50% 0 0 / 30% 30% 0 0" 라
+// 윗선 전체가 반지름 (0.6w, 0.3·언덕높이) 인 타원 호다. 줄기·부스러기가 이 곡선 위에 놓여야 공중에 뜨지 않는다
+function hillTopAt(x, w, h) {
+  const rx = 0.6 * w, ry = 0.3 * HILL * h;
+  const d = (x + 0.1 * w - rx) / rx;
+  return h - HILL * h + ry * (1 - Math.sqrt(Math.max(0, 1 - d * d)));
+}
+const lerp = (a, b, t) => a + (b - a) * t;
+
+function ChocoCap({ w, style }) {
+  const h = w * CAP_RATIO;
+  if (CAP_IMG) return <img src={CAP_IMG} alt="" draggable={false} style={{ width: w, height: h, objectFit: "contain", objectPosition: "bottom", display: "block", pointerEvents: "none", ...style }} />;
+  return <div style={{ width: w, height: h, borderRadius: "50% 50% 12% 12% / 70% 70% 14% 14%", background: `linear-gradient(135deg, ${M.chocoLite}, ${M.choco} 60%)`, boxShadow: "inset 4px 4px 6px rgba(255,255,255,.18), 0 3px 0 #2A1508", ...style }} />;
+}
+function BiscuitStem({ w, style }) {
+  const h = w * STEM_RATIO;
+  if (STEM_IMG) return <img src={STEM_IMG} alt="" draggable={false} style={{ width: w, height: h, objectFit: "contain", objectPosition: "bottom", display: "block", pointerEvents: "none", ...style }} />;
+  return <div style={{ width: w, height: h, borderRadius: "22% 22% 40% 40% / 8% 8% 14% 14%", background: `linear-gradient(90deg, ${M.stemDeep}, ${M.stem} 45%, ${M.stemDeep})`, boxShadow: "inset 0 -4px 0 #D9C08C", ...style }} />;
+}
+
 function MushroomScene({ onBack }) {
-  const spots = useMemo(() => Array.from({ length: 8 }, (_, i) => ({ id: i, i, j: rand(-2, 2), y: i % 2 ? 18 : 42, size: rand(0.8, 1.25), delay: i * 0.12 })), []);
-  const [capped, setCapped] = useState(() => new Set());
-  const [t, setT] = useState(0.2); // 0 day → 1 night
-  const [seed, setSeed] = useState(0);
-  const eaten = capped.size;
-
-  function popCap(id) { playCrunch(); setCapped((s) => new Set(s).add(id)); }
-  function replant() { setCapped(new Set()); setSeed((s) => s + 1); }
-
-  const skyTop = t < 0.5 ? mix(M.sky, M.dusk, t * 2) : mix(M.dusk, M.night, (t - 0.5) * 2);
-  const skyBot = t < 0.5 ? mix("#FFF0A8", "#FFB98A", t * 2) : mix("#FFB98A", "#5B4A8A", (t - 0.5) * 2);
-
   const desktop = useDesktop();
-  const k = desktop ? 1.55 : 1; // 데스크톱은 버섯을 크게
-  const onMove = (e) => { const r = e.currentTarget.getBoundingClientRect(); setT((e.clientX - r.left) / r.width); };
-  const onTouch = (e) => { const r = e.currentTarget.getBoundingClientRect(); setT((e.touches[0].clientX - r.left) / r.width); };
-  const skyBg = `linear-gradient(180deg, ${skyTop}, ${skyBot} 55%, ${M.grass} 55%)`;
+  const areaRef = useRef(null);
+  const dims = useSize(areaRef);
+  const measure = () => { const el = areaRef.current; return el ? { w: el.clientWidth, h: el.clientHeight } : dims; }; // 실제 크기는 매번 요소에서 직접 읽는다
+
+  const capW = desktop ? 92 : 66, capH = capW * CAP_RATIO;
+  const stemW = capW * 0.52, stemH = stemW * STEM_RATIO;
+  const OVERLAP = stemH * 0.26; // 줄기 윗부분이 이만큼 갓 안으로 들어간다 (실제 きのこの山 처럼)
+
+  const devT = new URLSearchParams(window.location.search).get("mush"); // ?mush=0.7 로 그 시각부터 바로 플레이 (개발용)
+  const [phase, setPhase] = useState(devT != null ? "play" : "ready"); // ready → play → done
+  const [, setFrame] = useState(0);
+  const g = useRef(null);
+  const stars = useMemo(() => Array.from({ length: 46 }, (_, i) => ({ id: i, x: rand(0, 100), y: rand(0, 62), s: rand(1.5, 3.2), d: rand(0, 3) })), []);
+
+  function fresh() {
+    const { w } = measure();
+    const t0 = devT != null ? clamp(+devT || 0, 0, 0.99) : 0;
+    const order = HILL_SLOTS.map((_, i) => i).sort(() => Math.random() - 0.5); // 이번 판에 슬롯이 채워지는 순서
+    const dropped = Math.round(t0 * N_CAPS);
+    const planted = Array.from({ length: Math.round(dropped * 0.8) }, (_, i) => ({ id: -1 - i, slot: order[i] }));
+    return { t: t0, x: w / 2, tx: w / 2, caps: [], crumbs: [], order, planted, missed: 0, dropped, interval: 1.2, spawn: 1.2, hold: 0, nextId: 1, pending: 0 };
+  }
+  if (!g.current) g.current = fresh();
+  const s = g.current;
+
+  function start() { g.current = fresh(); setPhase("play"); }
+
+  // 포인터 위치 → 줄기 목표 x
+  const onPointer = (e) => { const r = e.currentTarget.getBoundingClientRect(); g.current.tx = e.clientX - r.left; };
+
+  useEffect(() => {
+    if (phase !== "play") return;
+    let raf, last = performance.now();
+    const step = (now) => {
+      const dt = Math.min(0.05, (now - last) / 1000); last = now;
+      const s = g.current, { w, h } = measure();
+      if (!w || !h) { raf = requestAnimationFrame(step); return; }
+      const groundAt = (x) => hillTopAt(x, w, h) + 6; // 언덕 곡선을 따라 살짝 파묻힌 바닥선
+      // 줄기 이동 (부드럽게 따라감)
+      s.x = clamp(s.x + (s.tx - s.x) * Math.min(1, dt * 40), capW / 2, w - capW / 2); // 거의 즉시 따라감
+      const stemTop = groundAt(s.x) - stemH;
+      // 갓 생성 — 슬롯 수만큼만. 뒤로 갈수록 자주, 빠르게, 옆으로 흔들리며
+      if (s.dropped < N_CAPS) {
+        s.spawn -= dt;
+        if (s.spawn <= 0) {
+          const drift = s.t > 0.35 ? rand(-1, 1) * lerp(0, 70, (s.t - 0.35) / 0.65) : 0;
+          s.caps.push({ id: s.nextId++, x: rand(capW / 2 + 8, w - capW / 2 - 8), y: -capH - 10, vy: lerp(170, 340, s.t) * (desktop ? 1.25 : 1), vx: drift, rot: rand(-14, 14), spin: rand(-30, 30) });
+          s.dropped += 1;
+          s.interval = lerp(1.4, 0.7, s.dropped / N_CAPS); s.spawn = s.interval;
+        }
+      }
+      // 하루의 흐름 = 떨어진 갓 수 (마지막 갓이 떨어지는 순간 밤)
+      s.t = clamp((s.dropped - (s.dropped < N_CAPS ? s.spawn / s.interval : 0)) / (N_CAPS - 1), 0, 1);
+      // 갓 낙하 / 받기 / 놓치기
+      const keep = [];
+      for (const c of s.caps) {
+        c.y += c.vy * dt; c.x += c.vx * dt; c.rot += c.spin * dt;
+        if (c.x < capW / 2) { c.x = capW / 2; c.vx = Math.abs(c.vx); }
+        if (c.x > w - capW / 2) { c.x = w - capW / 2; c.vx = -Math.abs(c.vx); }
+        const bottom = c.y + capH;
+        // 받기 판정: 갓 박스가 줄기 윗부분(머리~절반)과 겹치면 성공. 가장자리끼리 닿아도 인정
+        const touchX = Math.abs(c.x - s.x) <= capW * 0.5 + stemW * 0.35;
+        const touchY = bottom >= stemTop - 4 && c.y <= stemTop + stemH * 0.55;
+        if (touchX && touchY) {
+          // 받았다 → 잠깐 줄기 위에 얹혀 보였다가 언덕에 심긴다
+          s.hold = 0.42; s.pending = (s.pending || 0) + 1; playCapCatch();
+          continue;
+        }
+        const groundY = groundAt(c.x);
+        if (bottom >= groundY + 8) {
+          s.missed += 1; playCapMiss();
+          for (let i = 0; i < 7; i++) s.crumbs.push({ id: s.nextId++, x: c.x + rand(-10, 10), y: groundY + rand(-4, 4), vx: rand(-90, 90), vy: rand(-220, -60), life: rand(0.5, 0.8), size: rand(4, 9) });
+          continue;
+        }
+        keep.push(c);
+      }
+      s.caps = keep;
+      if (s.hold > 0) {
+        s.hold -= dt;
+        if (s.hold <= 0) {
+          while (s.pending > 0) { s.planted.push({ id: s.nextId++, slot: s.order[s.planted.length] }); s.pending -= 1; }
+        }
+      }
+      // 부스러기
+      for (const p of s.crumbs) { p.life -= dt; p.vy += 600 * dt; p.x += p.vx * dt; p.y += p.vy * dt; }
+      s.crumbs = s.crumbs.filter((p) => p.life > 0);
+      setFrame((f) => f + 1);
+      if (s.dropped >= N_CAPS && s.caps.length === 0 && s.hold <= 0) { s.crumbs = []; setPhase("done"); playClear(); return; }
+      raf = requestAnimationFrame(step);
+    };
+    raf = requestAnimationFrame(step);
+    return () => cancelAnimationFrame(raf);
+  }, [phase]);
+
+  const t = s.t;
+  const DUSK = 0.58; // 이 시각까지 노을, 그 뒤로 밤
+  const skyTop = t < DUSK ? mix(M.sky, M.dusk, t / DUSK) : mix(M.dusk, M.night, (t - DUSK) / (1 - DUSK));
+  const skyBot = t < DUSK ? mix("#FFF0A8", "#FFB98A", t / DUSK) : mix("#FFB98A", "#5B4A8A", (t - DUSK) / (1 - DUSK));
+  const skyBg = `linear-gradient(180deg, ${skyTop}, ${skyBot})`;
+  const nightAmt = clamp((t - DUSK) / (1 - DUSK), 0, 1); // 별·달·언덕 어두워짐
+  const { w: W, h: H } = measure();
+  const groundY = H * (1 - HILL) + 6; // 해·달 궤도의 지평선 기준
+  const stemGround = hillTopAt(s.x, W, H) + 6;
+  const stemTop = stemGround - stemH;
+  const slope = (hillTopAt(s.x + 10, W, H) - hillTopAt(s.x - 10, W, H)) / 20; // 경사 → 줄기를 살짝 기울임
+  const stemTilt = Math.atan(slope) * 180 / Math.PI * 0.7;
+  const sunSize = desktop ? 96 : 70;
+  const SUNSET = 0.72, sunT = clamp(t / SUNSET, 0, 1);
+  const sunX = lerp(0.08, 0.92, sunT) * W - sunSize / 2;
+  const sunY = groundY - Math.sin(Math.PI * sunT) * (groundY - sunSize * 0.6) - sunSize / 2; // 지평선에서 떠서 지평선으로
+  const sunFade = 1 - clamp((t - 0.62) / 0.1, 0, 1);
+  const moonT = clamp((t - 0.66) / 0.34, 0, 1);
+  const moonY = groundY - Math.sin(Math.PI * moonT * 0.5) * (groundY * 0.78) - sunSize / 2;
+  const planted = s.planted.length;
 
   const title = (
     <div>
-      <h1 style={{ fontFamily: F.disp, fontSize: desktop ? "clamp(40px, 3.6vw, 56px)" : "clamp(34px, 7vw, 64px)", lineHeight: 1.05, margin: 0, color: M.choco, textShadow: `3px 3px 0 ${M.stem}` }}>きのこの<br />おか</h1>
-      <div style={{ marginTop: desktop ? 16 : 8, fontSize: 13, fontWeight: 700, letterSpacing: ".18em", color: M.choco, opacity: .75 }}>버섯 언덕</div>
-      <p style={{ margin: desktop ? "34px 0 0" : "10px 0 0", maxWidth: 320, fontSize: desktop ? 17 : 14, lineHeight: desktop ? 1.85 : 1.6, fontWeight: 700, wordBreak: "keep-all" }}>버섯을 누르면 초콜릿 갓이 톡 떨어져요!<br />커서를 오른쪽으로 옮기면 밤이 찾아옵니다. 여덟 개를 다 먹어 보세요.</p>
+      <h1 style={{ fontFamily: F.disp, fontSize: desktop ? "clamp(40px, 3.6vw, 56px)" : "clamp(26px, 6vw, 36px)", lineHeight: 1.05, margin: 0, color: M.choco, textShadow: `3px 3px 0 ${M.stem}` }}>きのこ{desktop ? <br /> : " "}キャッチ</h1>
+      <div style={{ marginTop: desktop ? 16 : 2, fontSize: desktop ? 13 : 11, fontWeight: 700, letterSpacing: ".18em", color: M.choco, opacity: .75 }}>초코 버섯 받기</div>
+      {desktop && <p style={{ margin: "34px 0 0", maxWidth: 340, fontSize: "clamp(13px, 1.1vw, 15.5px)", lineHeight: 1.9, fontWeight: 700, wordBreak: "keep-all" }}>초콜릿 갓을 비스킷 줄기로 받아보세요!<br />받을 때마다 버섯이 언덕에 심겨요.<br />밤이 될때까지 언덕을 가득 채워보세요!</p>}
     </div>
   );
   const score = (
     <div style={{ textAlign: desktop ? "left" : "right" }}>
-      <div style={{ fontFamily: F.disp, fontSize: desktop ? 60 : 44, color: M.choco, lineHeight: 1 }}>{eaten}<span style={{ fontSize: desktop ? 24 : 18 }}>/{spots.length}</span></div>
-      <div style={{ fontSize: desktop ? 15 : 12, fontWeight: 700, letterSpacing: ".1em", marginTop: desktop ? 4 : 0 }}>먹은 갓</div>
+      <div style={{ fontFamily: F.disp, fontSize: desktop ? 60 : 44, color: M.choco, lineHeight: 1 }}>{planted}<span style={{ fontSize: desktop ? 22 : 16, marginLeft: 6 }}>/ {N_CAPS}</span></div>
+      <div style={{ fontSize: desktop ? 15 : 12, fontWeight: 700, letterSpacing: ".1em", marginTop: desktop ? 4 : 0 }}>심은 버섯 · 놓침 {s.missed}</div>
     </div>
   );
-  const sun = <div style={{ position: "absolute", top: 60, left: `${12 + t * 70}%`, width: desktop ? 96 : 70, height: desktop ? 96 : 70, borderRadius: "50%", background: t > 0.6 ? "#FFF6CC" : "#FFF07A", boxShadow: t > 0.6 ? "0 0 40px #FFF6CC66" : "0 0 60px #FFE24A", transition: "all .3s" }} />;
-  const hill = (
-    <>
-      <div style={{ position: "absolute", left: "-10%", right: "-10%", bottom: 0, height: "46%", background: `radial-gradient(ellipse at 50% 100%, ${M.grass}, ${M.grassDeep})`, borderRadius: "50% 50% 0 0 / 40% 40% 0 0" }} />
-      <div key={seed} style={{ position: "absolute", left: 0, right: 0, bottom: 0, height: "46%" }}>
-        {spots.map((s) => {
-          const gone = capped.has(s.id);
-          return (
-            <div key={s.id} className="shroom" role="button" data-silent tabIndex={0} aria-label="버섯 갓 떼기" onClick={() => !gone && popCap(s.id)} onKeyDown={(e) => e.key === "Enter" && !gone && popCap(s.id)} style={{ position: "absolute", left: `${(desktop ? 4 + s.i * 8.8 : 8 + s.i * 12) + s.j}%`, bottom: `${s.y}%`, transform: `scale(${s.size * k})`, transformOrigin: "bottom center" }}>
-              <div style={{ position: "relative", width: 56, height: 90, animation: `sprout .6s cubic-bezier(.2,.9,.3,1.3) ${s.delay}s both`, transformOrigin: "bottom center" }}>
-                {/* cap */}
-                <div style={{ position: "absolute", top: 0, left: 0, width: 56, height: 40, borderRadius: "28px 28px 8px 8px", background: `linear-gradient(135deg, ${M.chocoLite}, ${M.choco} 60%)`, boxShadow: "inset 4px 4px 6px rgba(255,255,255,.18), 0 3px 0 #2A1508", animation: gone ? "capDrop .8s cubic-bezier(.5,0,.9,.6) forwards" : "none", "--x": `${rand(-40, 40)}px`, "--r": `${rand(-200, 200)}deg`, zIndex: 2 }} />
-                {/* stem */}
-                <div style={{ position: "absolute", top: 34, left: 15, width: 26, height: 56, borderRadius: "6px 6px 12px 12px", background: `linear-gradient(90deg, ${M.stemDeep}, ${M.stem} 45%, ${M.stemDeep})`, boxShadow: "inset 0 -4px 0 #D9C08C" }} />
-                {gone && <div style={{ position: "absolute", top: -22, left: 0, right: 0, textAlign: "center", fontFamily: F.disp, fontSize: 13, color: M.choco, animation: "floaty 1.2s ease-in-out infinite" }}>ぱくっ</div>}
-              </div>
-            </div>
-          );
-        })}
+  const dayBar = (
+    <div style={{ marginTop: desktop ? 14 : 0, maxWidth: desktop ? 320 : "none" }}>
+      <div style={{ display: "flex", justifyContent: "space-between", fontSize: desktop ? 13 : 11, fontWeight: 700 }}><span>☀ あさ</span><span>よる ☾</span></div>
+      <div style={{ position: "relative", height: 8, marginTop: desktop ? 8 : 4, borderRadius: 99, background: `linear-gradient(90deg, ${M.sky}, ${M.dusk}, ${M.night})` }}>
+        <div style={{ position: "absolute", top: -4, left: `calc(${t * 100}% - 8px)`, width: 16, height: 16, borderRadius: "50%", background: "#fff", border: `3px solid ${M.choco}` }} />
       </div>
+    </div>
+  );
+
+  const sky = (
+    <>
+      {/* 별 — 해질녘부터 서서히 */}
+      {stars.map((st) => <div key={st.id} style={{ position: "absolute", left: `${st.x}%`, top: `${st.y}%`, width: st.s, height: st.s, borderRadius: "50%", background: "#FFF8D6", opacity: nightAmt * (0.55 + 0.45 * Math.sin((performance.now() / 600) + st.d)), boxShadow: "0 0 6px #FFF8D6" }} />)}
+      {/* 해 */}
+      <div style={{ position: "absolute", left: sunX, top: sunY, width: sunSize, height: sunSize, borderRadius: "50%", background: t > 0.4 ? "#FFB347" : "#FFF07A", boxShadow: t > 0.4 ? "0 0 50px #FF9E4A99" : "0 0 60px #FFE24A", opacity: sunFade }} />
+      {/* 달 */}
+      <div style={{ position: "absolute", left: `${lerp(6, 18, moonT)}%`, top: moonY, width: sunSize * 0.7, height: sunSize * 0.7, borderRadius: "50%", background: "#FFF6CC", boxShadow: `inset ${-sunSize * 0.16}px ${-sunSize * 0.08}px 0 ${mix("#2C2A5E", "#5B4A8A", 0.4)}, 0 0 40px #FFF6CC66`, opacity: clamp(moonT * 2, 0, 1) }} />
     </>
   );
-  const box = <img src={MUSH_IMG} alt="" draggable={false} style={{ position: "absolute", right: 24, bottom: "8%", width: desktop ? "clamp(150px, 15vw, 210px)" : "clamp(140px, 22vw, 240px)", transform: "rotate(-6deg)", filter: "drop-shadow(0 10px 14px rgba(0,0,0,.25))", pointerEvents: "none" }} />;
-  const done = eaten === spots.length && (
-    <div style={{ position: "absolute", left: "50%", bottom: "12%", transform: "translateX(-50%)", textAlign: "center", animation: "fadeIn .4s both" }}>
-      <div style={{ fontFamily: F.disp, fontSize: 28, color: M.stem, textShadow: `2px 2px 0 ${M.choco}` }}>ぜんぶ たべた！</div>
-      <button className="btn" onClick={replant} style={{ marginTop: 10, background: M.choco, color: M.stem, boxShadow: "0 4px 0 #2A1508" }}>다시 심기</button>
+
+  const hill = (
+    <div style={{ position: "absolute", left: "-10%", right: "-10%", bottom: 0, height: `${HILL * 100}%`, background: `radial-gradient(ellipse at 50% 100%, ${M.grass}, ${M.grassDeep})`, borderRadius: "50% 50% 0 0 / 30% 30% 0 0", zIndex: 1 }}>
+      <div style={{ position: "absolute", inset: 0, borderRadius: "inherit", background: "#141438", opacity: nightAmt * 0.45 }} />
+      {/* 심은 버섯들 — 고정 슬롯에 채워짐. 언덕 div 가 화면보다 20% 넓게(-10%~) 깔려 있어서 화면 % → 언덕 % 로 환산 */}
+      {s.planted.map((m) => {
+        const sl = HILL_SLOTS[m.slot];
+        const scale = sl.sc * (desktop ? 1 : 0.85);
+        return (
+          <div key={m.id} style={{ position: "absolute", left: `${(sl.x + 10) / 1.2}%`, bottom: `${sl.y}%`, width: capW * scale, marginLeft: -capW * scale / 2, transformOrigin: "bottom center", animation: `sprout .55s cubic-bezier(.2,.9,.3,1.3) both`, zIndex: sl.z }}>
+            <BiscuitStem w={stemW * scale} style={{ margin: "0 auto", marginTop: (capH - OVERLAP) * scale }} />
+            <ChocoCap w={capW * scale} style={{ position: "absolute", left: 0, top: 0 }} />
+          </div>
+        );
+      })}
     </div>
+  );
+
+  const player = phase !== "ready" && (
+    <div style={{ position: "absolute", left: s.x - stemW / 2, top: stemTop, width: stemW, zIndex: 2, pointerEvents: "none", transform: `rotate(${stemTilt}deg)`, transformOrigin: "bottom center" }}>
+      <BiscuitStem w={stemW} />
+      {s.hold > 0 && <ChocoCap w={capW} style={{ position: "absolute", left: (stemW - capW) / 2, top: -(capH - OVERLAP), animation: "openPopL .3s ease-out both" }} />}
+    </div>
+  );
+  const falling = s.caps.map((c) => <div key={c.id} style={{ position: "absolute", left: c.x - capW / 2, top: c.y, transform: `rotate(${c.rot}deg)`, zIndex: 3, filter: "drop-shadow(0 6px 6px rgba(0,0,0,.25))" }}><ChocoCap w={capW} /></div>);
+  const crumbs = s.crumbs.map((p) => <div key={p.id} style={{ position: "absolute", left: p.x, top: p.y, width: p.size, height: p.size, borderRadius: "40%", background: M.choco, opacity: clamp(p.life * 2, 0, 1), zIndex: 3 }} />);
+
+  const overlayWrap = { position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", paddingBottom: `${HILL * 60}%`, zIndex: 5, pointerEvents: "none" };
+  const overlayCard = { textAlign: "center", background: "rgba(255,243,214,.95)", border: `4px solid ${M.choco}`, borderRadius: 22, padding: desktop ? "30px 44px" : "22px 28px", boxShadow: "0 10px 0 #2A1508", animation: "fadeIn .35s both", minWidth: desktop ? 340 : 250, pointerEvents: "auto" };
+  const bigBtn = { marginTop: 18, background: M.choco, color: M.stem, boxShadow: "0 5px 0 #2A1508", fontSize: desktop ? 19 : 16, padding: desktop ? "14px 30px" : "11px 22px" };
+  const ready = phase === "ready" && (
+    <div style={overlayWrap}><div style={overlayCard}>
+      <div style={{ fontFamily: F.disp, fontSize: desktop ? 30 : 24, color: M.choco }}>きのこキャッチ</div>
+      <div style={{ marginTop: 10, fontSize: desktop ? 15 : 13, fontWeight: 700, color: M.ink, lineHeight: 1.6 }}>{desktop ? "마우스를 좌우로 움직여" : "화면을 좌우로 문질러"} 초콜릿을 받으세요</div>
+      <button className="btn" onClick={start} style={bigBtn}>시작하기</button>
+    </div></div>
+  );
+  const done = phase === "done" && (
+    <div style={overlayWrap}><div style={overlayCard}>
+      <div style={{ fontFamily: F.disp, fontSize: desktop ? 30 : 24, color: M.choco }}>{planted === N_CAPS ? "きのこ いっぱい！" : "よるに なりました"}</div>
+      <div style={{ fontSize: desktop ? 13 : 12, fontWeight: 700, color: M.ink, opacity: .7, marginTop: 2 }}>{planted === N_CAPS ? "언덕이 버섯으로 가득 찼어요!" : "밤이 되었어요"}</div>
+      <div style={{ fontFamily: F.disp, fontSize: desktop ? 68 : 52, color: M.choco, lineHeight: 1.1, marginTop: 10 }}>{planted}<span style={{ fontSize: desktop ? 24 : 18, marginLeft: 6 }}>개</span></div>
+      <div style={{ fontSize: desktop ? 16 : 13, fontWeight: 700, color: M.ink, marginTop: desktop ? 14 : 10 }}>버섯을 심었어요 · 놓친 갓 {s.missed}개</div>
+      <button className="btn" onClick={start} style={bigBtn}>다시 하기</button>
+    </div></div>
+  );
+
+  const field = (
+    <section ref={areaRef} onPointerMove={onPointer} onPointerDown={onPointer} style={{ position: "relative", overflow: "hidden", background: skyBg, touchAction: "none", cursor: phase === "play" ? "none" : "default", flex: 1, minHeight: 0 }}>
+      {sky}
+      {hill}
+      {player}
+      {falling}
+      {crumbs}
+      {ready}
+      {done}
+    </section>
   );
 
   if (desktop) {
     return (
       <div className="scene" style={{ height: "100vh", display: "grid", gridTemplateColumns: GAME_COLS, background: M.stem, color: M.ink, overflow: "hidden" }}>
         <SidePanel bg={M.stem} border={M.choco} color={M.ink}>
-          <TopBar index="01" title="きのこの山" color={M.ink} onBack={onBack} />
+          <TopBar onBack={onBack} />
           <div style={{ ...PANEL_BODY, paddingLeft: 40 }}>
             <div style={{ ...PANEL_GROUP, margin: "7vh 0 auto" }}>
               {title}
               {score}
-              {/* 낮↔밤 표시 — 점수 바로 아래 */}
-              <div style={{ marginTop: 14, maxWidth: 320 }}>
-                <div style={{ display: "flex", justifyContent: "space-between", fontSize: 13, fontWeight: 700 }}><span>☀ ひる</span><span>よる ☾</span></div>
-                <div style={{ position: "relative", height: 8, marginTop: 8, borderRadius: 99, background: `linear-gradient(90deg, ${M.sky}, ${M.dusk}, ${M.night})` }}>
-                  <div style={{ position: "absolute", top: -4, left: `calc(${Math.max(0, Math.min(1, t)) * 100}% - 8px)`, width: 16, height: 16, borderRadius: "50%", background: "#fff", border: `3px solid ${M.choco}`, transition: "left .15s" }} />
-                </div>
-                <div style={{ marginTop: 8, fontSize: 12, fontWeight: 700, opacity: .7 }}>오른쪽 언덕 위에서 커서를 좌우로 움직여 보세요</div>
-              </div>
+              {dayBar}
             </div>
           </div>
         </SidePanel>
-        <section onMouseMove={onMove} onTouchMove={onTouch} style={{ position: "relative", overflow: "hidden", background: skyBg, transition: "background .3s" }}>
-          {sun}
-          {hill}
-          {box}
-          {done}
-        </section>
+        {field}
       </div>
     );
   }
   return (
-    <div className="scene" onMouseMove={onMove} onTouchMove={onTouch} style={{ minHeight: "100vh", background: skyBg, color: M.ink, position: "relative", overflow: "hidden", transition: "background .3s" }}>
-      {sun}
-      <TopBar index="01" color={M.ink} onBack={onBack} />
-      <header style={{ position: "relative", padding: "12px 24px 0", display: "flex", justifyContent: "space-between", flexWrap: "wrap", gap: 12 }}>
-        {title}
-        {score}
-      </header>
-      {hill}
-      {box}
-      {done}
+    <div className="scene" style={{ height: "100vh", display: "flex", flexDirection: "column", background: skyBg, color: M.ink, position: "relative", overflow: "hidden" }}>
+      {/* 모바일 상단 패널 — 밤하늘 위에서도 글자가 읽히도록 데스크톱과 같은 크림색 배경 */}
+      <div style={{ background: M.stem, borderBottom: `4px solid ${M.choco}`, position: "relative", zIndex: 2, flexShrink: 0 }}>
+        <TopBar onBack={onBack} />
+        <header style={{ position: "relative", padding: "8px 24px 10px", display: "flex", justifyContent: "space-between", alignItems: "flex-end", gap: 12 }}>
+          {title}
+          {score}
+        </header>
+        <div style={{ padding: "0 24px 12px" }}>{dayBar}</div>
+      </div>
+      {field}
     </div>
   );
 }

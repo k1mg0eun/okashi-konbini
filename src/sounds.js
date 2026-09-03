@@ -10,7 +10,9 @@ import wrongUrl from "./assets/sounds/wrong.wav";              // 동물 과자:
 import drinkUrl from "./assets/sounds/drink.wav";              // 음료 냉장고: 음료 마실 때 (뽁·치익·꿀꺽)
 import restockUrl from "./assets/sounds/restock.wav";          // 음료 냉장고: 새 음료가 채워질 때 (스르륵·챙)
 import fridgeUrl from "./assets/sounds/fridge.wav";            // 음료 냉장고: 유리문 여닫을 때 (드르륵)
-import clearUrl from "./assets/sounds/clear.wav";              // 클리어 축하 멜로디 (감자 20층 완성, 동물 과자 전부 맞히기)
+import clearUrl from "./assets/sounds/clear.wav";
+import capCatchUrl from "./assets/sounds/mushroom-catch.wav";   // 버섯 갓 받기: 갓이 줄기에 끼워질 때 "톡·띵"
+import capMissUrl from "./assets/sounds/mushroom-miss.wav";     // 버섯 갓 받기: 갓이 땅에 떨어져 바스러질 때 "툭·바삭"              // 클리어 축하 멜로디 (감자 20층 완성, 동물 과자 전부 맞히기)
 
 // BGM은 앱 전체에서 하나만 존재해야 하므로 모듈 레벨에 둔다.
 // (컴포넌트 안에서 만들면 리렌더링·씬 전환마다 새로 생길 수 있음)
@@ -48,6 +50,8 @@ export function playWrong() { playOnce(wrongUrl, 0.6); }
 export function playDrink() { playOnce(drinkUrl, 0.3); }
 export function playRestock() { playOnce(restockUrl, 0.7); }
 export function playFridge() { playOnce(fridgeUrl, 0.6); }
+export function playCapCatch() { playOnce(capCatchUrl, 0.7); }
+export function playCapMiss() { playOnce(capMissUrl, 0.6); }
 
 // 상자 위 고양이: 클릭하면 "야옹". src/assets/sounds/meow.mp3 (또는 .wav) 를 넣으면 자동으로 붙고, 없으면 조용히 넘어간다
 const meowFiles = import.meta.glob("./assets/sounds/meow.{mp3,wav,m4a,ogg}", { eager: true, query: "?url", import: "default" });
